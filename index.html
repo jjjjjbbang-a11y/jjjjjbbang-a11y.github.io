@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="회의 녹음">
+<title>회의 녹음 & AI 분석</title>
+<style>
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --surface2: #f0ede8;
+    --text: #1a1a18;
+    --text2: #6b6a66;
+    --text3: #9e9d99;
+    --border: rgba(0,0,0,0.10);
+    --border2: rgba(0,0,0,0.18);
+    --accent: #d94f3d;
+    --accent-light: #faeae8;
+    --accent-dark: #a33228;
+    --info: #1a6fb5;
+    --info-light: #e6f0fa;
+    --success: #2a7a4b;
+    --success-light: #e6f5ed;
+    --warn: #a06000;
+    --warn-light: #fef3e0;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a18;
+      --surface: #242422;
+      --surface2: #2e2e2b;
+      --text: #f0efe9;
+      --text2: #a09f9a;
+      --text3: #6b6a66;
+      --border: rgba(255,255,255,0.10);
+      --border2: rgba(255,255,255,0.18);
+      --accent-light: #3d1a16;
+      --info-light: #0e2d4a;
+      --success-light: #0d2d1e;
+      --warn-light: #2d1e00;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, 'Helvetica Neue', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding-bottom: env(safe-area-inset-bottom, 20px);
+  }
+  .topbar {
+    background: var(--surface);
+    border-bottom: 0.5px solid var(--border);
+    padding: 16px 20px 12px;
+    padding-top: calc(16px + env(safe-area-inset-top, 0px));
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .topbar h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+  .topbar p { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .main { padding: 16px; max-width: 480px; margin: 0 auto; }
+  .card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 0.5px solid var(--border);
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: var(--shadow);
+  }
+  .card-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 12px;
+  }
+  .name-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .name-row label { font-size: 13px; color: var(--text2); }
+  .name-row input {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 15px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    color: var(--text);
+    outline: none;
+  }
+  .name-row input:focus { border-color: var(--accent); }
+  .rec-center { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 8px 0 4px; }
+  .visualizer {
+    width: 100%;
+    height: 44px;
+    border-radius: var(--radius-sm);
+    background: var(--surface2);
+    display: block;
+  }
+  .timer { font-size: 36px; font-weight: 300; letter-spacing: 2px; color: var(--text); font-variant-numeric: tabular-nums; }
+  .status-row { display: flex; align-items: center; gap: 6px; height: 22px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text3); }
+  .dot.live { background: var(--accent); animation: blink 1s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.25} }
+  .status-txt { font-size: 13px; color: var(--text2); }
+  .rec-btn {
+    width: 76px; height: 76px;
+    border-radius: 50%;
+    border: none;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: transform 0.15s, background 0.2s;
+    box-shadow: 0 4px 16px rgba(217,79,61,0.35);
+  }
+  .rec-btn:active { transform: scale(0.94); }
+  .rec-btn.recording { background: var(--accent-dark); animation: pulse 1.4s infinite; }
+  @keyframes pulse { 0%,100%{box-shadow:0 4px 16px rgba(217,79,61,0.35)} 50%{box-shadow:0 4px 28px rgba(217,79,61,0.6)} }
+  .rec-btn svg { width: 30px; height: 30px; fill: white; }
+  .btn-row { display: flex; gap: 8px; width: 100%; }
+  .ctrl-btn {
+    flex: 1;
+    padding: 10px;
+    font-size: 13px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    transition: background 0.15s;
+  }
+  .ctrl-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .ctrl-btn:not(:disabled):active { background: var(--border); }
+  .ctrl-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+  .rec-list { display: flex; flex-direction: column; gap: 8px; }
+  .empty { font-size: 13px; color: var(--text3); text-align: center; padding: 20px 0; }
+  .rec-item {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+  }
+  .rec-icon {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--info-light);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .rec-icon svg { width: 18px; height: 18px; stroke: var(--info); fill: none; stroke-width: 2; stroke-linecap: round; }
+  .rec-info { flex: 1; min-width: 0; }
+  .rec-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rec-meta { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .rec-actions { display: flex; gap: 6px; }
+  .sm-btn {
+    padding: 6px 10px; font-size: 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.12s;
+  }
+  .sm-btn:active { background: var(--surface2); }
+  .sm-btn.ai { border-color: var(--accent); color: var(--accent); font-weight: 500; }
+  .sm-btn.ai:active { background: var(--accent-light); }
+  .sm-btn.dl { border-color: var(--info); color: var(--info); }
+  .sm-btn.del { color: var(--text3); }
+  .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+  .tab {
+    flex: 1; padding: 10px 4px;
+    font-size: 13px; color: var(--text2);
+    background: none; border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer; text-align: center;
+    transition: color 0.15s;
+  }
+  .tab.on { color: var(--text); border-bottom-color: var(--accent); font-weight: 500; }
+  .pane { display: none; }
+  .pane.on { display: block; }
+  .rbox {
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .rbox-lbl {
+    font-size: 11px; font-weight: 600; color: var(--text3);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+  .rbox-txt { font-size: 14px; color: var(--text); line-height: 1.7; white-space: pre-wrap; }
+  .etags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .etag { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+  .etag.positive { background: var(--success-light); color: var(--success); }
+  .etag.negative { background: var(--accent-light); color: var(--accent); }
+  .etag.neutral { background: var(--surface2); color: var(--text2); border: 1px solid var(--border2); }
+  .etag.warning { background: var(--warn-light); color: var(--warn); }
+  .spinner-wrap { display: flex; align-items: center; gap: 8px; padding: 20px 0; justify-content: center; }
+  .spinner { width: 16px; height: 16px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spin-txt { font-size: 13px; color: var(--text2); }
+  .err { font-size: 13px; color: var(--accent); background: var(--accent-light); padding: 10px 14px; border-radius: var(--radius-sm); }
+  .transcript-box { max-height: 220px; overflow-y: auto; }
+  .no-result { font-size: 13px; color: var(--text3); text-align: center; padding: 24px 0; }
+  .api-section { margin-bottom: 12px; }
+  .api-section label { font-size: 13px; color: var(--text2); display: block; margin-bottom: 6px; }
+  .api-input-row { display: flex; gap: 6px; }
+  .api-input {
+    flex: 1; padding: 9px 12px;
+    font-size: 13px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    color: var(--text);
+    outline: none;
+    font-family: monospace;
+  }
+  .api-input:focus { border-color: var(--accent); }
+  .save-btn {
+    padding: 9px 14px;
+    font-size: 13px;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: var(--accent);
+    color: white;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .save-btn:active { background: var(--accent-dark); }
+  .api-note { font-size: 11px; color: var(--text3); margin-top: 6px; line-height: 1.5; }
+  .api-saved { font-size: 12px; color: var(--success); margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>회의 녹음 & AI 분석</h1>
+  <p>녹음 후 말투 · 감정 · 요약을 AI로 분석합니다</p>
+</div>
+<div class="main">
+
+  <!-- API 키 설정 -->
+  <div class="card" id="apiCard">
+    <div class="card-label">AI 분석 설정</div>
+    <div class="api-section">
+      <label>Anthropic API 키 (최초 1회 입력 후 기기에 저장됩니다)</label>
+      <div class="api-input-row">
+        <input type="password" class="api-input" id="apiKeyInput" placeholder="sk-ant-..." />
+        <button class="save-btn" onclick="saveApiKey()">저장</button>
+      </div>
+      <div class="api-note">API 키는 이 기기(핸드폰)에만 저장되며 외부로 전송되지 않습니다.<br>발급: console.anthropic.com → API Keys</div>
+      <div class="api-saved" id="apiSavedMsg" style="display:none;">저장되었습니다</div>
+    </div>
+  </div>
+
+  <!-- 녹음 -->
+  <div class="card">
+    <div class="card-label">녹음</div>
+    <div class="name-row">
+      <label>회의명</label>
+      <input type="text" id="meetingName" placeholder="예: 5월 팀장 회의" />
+    </div>
+    <div class="rec-center">
+      <canvas class="visualizer" id="viz"></canvas>
+      <div class="timer" id="timer">00:00</div>
+      <div class="status-row">
+        <div class="dot" id="dot"></div>
+        <div class="status-txt" id="stxt">녹음 준비됨</div>
+      </div>
+      <button class="rec-btn" id="recBtn" onclick="handleRec()">
+        <svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/><line x1="12" y1="19" x2="12" y2="23" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="8" y1="23" x2="16" y2="23" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <div class="btn-row">
+        <button class="ctrl-btn" id="pauseBtn" disabled onclick="handlePause()">
+          <svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+          일시정지
+        </button>
+        <button class="ctrl-btn" id="stopBtn" disabled onclick="handleStop()">
+          <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+          중지 & 저장
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 녹음 목록 -->
+  <div class="card">
+    <div class="card-label">저장된 녹음 목록</div>
+    <div class="rec-list" id="recList"><div class="empty">저장된 녹음이 없습니다</div></div>
+  </div>
+
+  <!-- 분석 결과 -->
+  <div class="card" id="resultCard" style="display:none;">
+    <div class="card-label" id="resultLbl">분석 결과</div>
+    <div class="tabs">
+      <button class="tab on" data-tab="summary" onclick="switchTab(this)">요약</button>
+      <button class="tab" data-tab="emotion" onclick="switchTab(this)">말투 & 감정</button>
+      <button class="tab" data-tab="transcript" onclick="switchTab(this)">텍스트</button>
+    </div>
+    <div class="pane on" id="pane-summary"></div>
+    <div class="pane" id="pane-emotion"></div>
+    <div class="pane" id="pane-transcript"></div>
+  </div>
+
+</div>
+
+<script>
+// --- State ---
+let mediaRecorder = null;
+let audioChunks = [];
+let timerInt = null;
+let startMs = 0;
+let elapsed = 0;
+let paused = false;
+let audioCtx = null;
+let analyser = null;
+let animId = null;
+let recordings = [];
+
+// --- DOM ---
+const timerEl = document.getElementById('timer');
+const dot = document.getElementById('dot');
+const stxt = document.getElementById('stxt');
+const recBtn = document.getElementById('recBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const stopBtn = document.getElementById('stopBtn');
+const canvas = document.getElementById('viz');
+const ctx2d = canvas.getContext('2d');
+
+// --- localStorage ---
+function loadData() {
+  try {
+    const raw = localStorage.getItem('meetingRecs');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // blob URLs don't survive, so we store base64
+      recordings = parsed;
+      renderList();
+    }
+  } catch(e) {}
+  const key = localStorage.getItem('anthropicApiKey');
+  if (key) {
+    document.getElementById('apiKeyInput').value = key;
+    document.getElementById('apiSavedMsg').style.display = 'block';
+  }
+}
+
+function saveData() {
+  try {
+    // only save metadata (not blob — too large for localStorage)
+    const meta = recordings.map(r => ({
+      id: r.id, name: r.name, duration: r.duration, date: r.date,
+      b64: r.b64 || null
+    }));
+    localStorage.setItem('meetingRecs', JSON.stringify(meta));
+  } catch(e) {}
+}
+
+function saveApiKey() {
+  const k = document.getElementById('apiKeyInput').value.trim();
+  if (!k) return;
+  localStorage.setItem('anthropicApiKey', k);
+  document.getElementById('apiSavedMsg').style.display = 'block';
+  setTimeout(() => document.getElementById('apiSavedMsg').style.display = 'none', 2000);
+}
+
+function getApiKey() {
+  return localStorage.getItem('anthropicApiKey') || document.getElementById('apiKeyInput').value.trim();
+}
+
+// --- Timer ---
+function fmt(ms) {
+  const s = Math.floor(ms/1000);
+  return String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+}
+
+// --- Visualizer ---
+function resizeCanvas() {
+  canvas.width = canvas.offsetWidth * (window.devicePixelRatio || 1);
+  canvas.height = canvas.offsetHeight * (window.devicePixelRatio || 1);
+  ctx2d.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+function drawIdle() {
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  ctx2d.clearRect(0, 0, W, H);
+  for (let i = 0; i < 40; i++) {
+    const h = 3 + Math.random() * 5;
+    ctx2d.fillStyle = 'rgba(155,154,150,0.25)';
+    ctx2d.beginPath();
+    ctx2d.roundRect(i*(W/40), H-h, W/40-1.5, h, 2);
+    ctx2d.fill();
+  }
+}
+drawIdle();
+
+function drawLive() {
+  if (!analyser) return;
+  animId = requestAnimationFrame(drawLive);
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  const data = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(data);
+  ctx2d.clearRect(0, 0, W, H);
+  const bars = 40;
+  for (let i = 0; i < bars; i++) {
+    const v = data[Math.floor(i*data.length/bars)] / 255;
+    const h = Math.max(3, v * H);
+    ctx2d.fillStyle = `rgba(217,79,61,${0.4 + v*0.6})`;
+    ctx2d.beginPath();
+    ctx2d.roundRect(i*(W/bars), H-h, W/bars-1.5, h, 2);
+    ctx2d.fill();
+  }
+}
+
+// --- Recording ---
+async function handleRec() {
+  if (mediaRecorder && mediaRecorder.state === 'paused') {
+    mediaRecorder.resume();
+    paused = false;
+    startMs = Date.now() - elapsed;
+    timerInt = setInterval(() => { elapsed = Date.now()-startMs; timerEl.textContent = fmt(elapsed); }, 500);
+    setUI('recording');
+    drawLive();
+    return;
+  }
+  if (mediaRecorder && mediaRecorder.state === 'recording') return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    audioCtx.createMediaStreamSource(stream).connect(analyser);
+    mediaRecorder = new MediaRecorder(stream, { mimeType: getSupportedMime() });
+    audioChunks = [];
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = () => finishRecording(stream);
+    mediaRecorder.start(100);
+    startMs = Date.now(); elapsed = 0;
+    timerInt = setInterval(() => { elapsed = Date.now()-startMs; timerEl.textContent = fmt(elapsed); }, 500);
+    setUI('recording');
+    drawLive();
+  } catch(e) {
+    stxt.textContent = '마이크 권한이 필요합니다';
+  }
+}
+
+function getSupportedMime() {
+  const types = ['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4'];
+  for (const t of types) { if (MediaRecorder.isTypeSupported(t)) return t; }
+  return '';
+}
+
+function handlePause() {
+  if (!mediaRecorder) return;
+  if (mediaRecorder.state === 'recording') {
+    mediaRecorder.pause();
+    clearInterval(timerInt);
+    cancelAnimationFrame(animId);
+    drawIdle();
+    setUI('paused');
+  } else if (mediaRecorder.state === 'paused') {
+    handleRec();
+  }
+}
+
+function handleStop() {
+  if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
+  mediaRecorder.stop();
+  clearInterval(timerInt);
+  cancelAnimationFrame(animId);
+  drawIdle();
+  setUI('idle');
+  timerEl.textContent = '00:00';
+}
+
+function setUI(state) {
+  if (state === 'idle') {
+    dot.className = 'dot'; stxt.textContent = '녹음 준비됨';
+    recBtn.className = 'rec-btn';
+    pauseBtn.disabled = true; stopBtn.disabled = true;
+    pauseBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="16" height="16"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg> 일시정지';
+  } else if (state === 'recording') {
+    dot.className = 'dot live'; stxt.textContent = '녹음 중';
+    recBtn.className = 'rec-btn recording';
+    pauseBtn.disabled = false; stopBtn.disabled = false;
+    pauseBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="16" height="16"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg> 일시정지';
+  } else if (state === 'paused') {
+    dot.className = 'dot'; stxt.textContent = '일시정지됨';
+    recBtn.className = 'rec-btn';
+    pauseBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="16" height="16"><polygon points="5,3 19,12 5,21"/></svg> 재개';
+  }
+}
+
+function blobToBase64(blob) {
+  return new Promise(res => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.readAsDataURL(blob);
+  });
+}
+
+async function finishRecording(stream) {
+  stream.getTracks().forEach(t => t.stop());
+  const mime = getSupportedMime() || 'audio/webm';
+  const blob = new Blob(audioChunks, { type: mime });
+  const url = URL.createObjectURL(blob);
+  const b64 = await blobToBase64(blob);
+  const name = document.getElementById('meetingName').value.trim() || '회의 녹음';
+  const rec = { id: Date.now(), name, url, b64, duration: elapsed, date: new Date().toLocaleDateString('ko-KR') };
+  recordings.unshift(rec);
+  saveData();
+  renderList();
+}
+
+// --- List ---
+function renderList() {
+  const el = document.getElementById('recList');
+  if (!recordings.length) { el.innerHTML = '<div class="empty">저장된 녹음이 없습니다</div>'; return; }
+  el.innerHTML = recordings.map((r, i) => `
+    <div class="rec-item">
+      <div class="rec-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke-linecap="round"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      </div>
+      <div class="rec-info">
+        <div class="rec-name">${r.name}</div>
+        <div class="rec-meta">${r.date} · ${fmt(r.duration)}</div>
+      </div>
+      <div class="rec-actions">
+        <button class="sm-btn ai" onclick="analyzeRec(${i})">AI 분석</button>
+        <button class="sm-btn dl" onclick="downloadRec(${i})">저장</button>
+        <button class="sm-btn del" onclick="deleteRec(${i})">삭제</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function downloadRec(i) {
+  const r = recordings[i];
+  const a = document.createElement('a');
+  a.href = r.url || r.b64;
+  a.download = r.name + '.webm';
+  a.click();
+}
+
+function deleteRec(i) {
+  if (!confirm(`"${recordings[i].name}" 녹음을 삭제할까요?`)) return;
+  if (recordings[i].url) URL.revokeObjectURL(recordings[i].url);
+  recordings.splice(i, 1);
+  saveData();
+  renderList();
+}
+
+// --- Tabs ---
+function switchTab(btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+  document.querySelectorAll('.pane').forEach(p => p.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('pane-' + btn.dataset.tab).classList.add('on');
+}
+
+// --- Analysis ---
+async function analyzeRec(i) {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    alert('먼저 API 키를 입력하고 저장해 주세요.');
+    document.getElementById('apiKeyInput').focus();
+    return;
+  }
+  const rec = recordings[i];
+  const resultCard = document.getElementById('resultCard');
+  resultCard.style.display = 'block';
+  document.getElementById('resultLbl').textContent = `분석 결과 — ${rec.name}`;
+  ['summary','emotion','transcript'].forEach(t => {
+    document.getElementById('pane-' + t).innerHTML =
+      '<div class="spinner-wrap"><div class="spinner"></div><span class="spin-txt">AI 분석 중...</span></div>';
+  });
+  resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  try {
+    let transcript = '';
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      transcript = await doSTT(rec.url || rec.b64);
+    }
+
+    const prompt = transcript
+      ? `다음은 "${rec.name}" 회의 녹음의 변환 텍스트입니다:\n\n"${transcript}"\n\n아래 JSON 형식으로만 응답하세요 (다른 텍스트 없이):\n{"summary":"핵심 내용 3~5줄 요약","sentiment_tags":[{"label":"감정/말투 키워드","type":"positive|negative|neutral|warning"}],"tone_analysis":"전반적인 말투와 분위기 분석 2~3줄","transcript":"${transcript.replace(/"/g,'\\"')}"}`
+      : `"${rec.name}" 회의 분석 요청입니다. 음성-텍스트 변환이 현재 환경에서 지원되지 않습니다. 안내 메시지를 JSON으로만 응답하세요:\n{"summary":"음성 텍스트 변환이 필요합니다. Chrome 브라우저에서 실행하시면 변환 후 분석이 가능합니다.","sentiment_tags":[{"label":"변환 필요","type":"warning"}],"tone_analysis":"크롬 브라우저에서 이 파일을 열고 다시 시도해 주세요.","transcript":"(음성 인식 미지원 환경)"}`;
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    const raw = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
+    let parsed;
+    try { parsed = JSON.parse(raw.replace(/```json|```/g,'').trim()); }
+    catch { throw new Error('응답 파싱 오류'); }
+    renderResult(parsed);
+  } catch(e) {
+    ['summary','emotion','transcript'].forEach(t => {
+      document.getElementById('pane-' + t).innerHTML = `<div class="err">오류: ${e.message}</div>`;
+    });
+  }
+}
+
+function doSTT(src) {
+  return new Promise(resolve => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { resolve(''); return; }
+    const audio = new Audio(src);
+    const rec = new SR();
+    rec.lang = 'ko-KR'; rec.continuous = true; rec.interimResults = false;
+    let text = '';
+    rec.onresult = e => { for (let i = e.resultIndex; i < e.results.length; i++) { if (e.results[i].isFinal) text += e.results[i][0].transcript + ' '; } };
+    rec.onend = () => resolve(text.trim());
+    rec.onerror = () => resolve(text.trim());
+    audio.play().catch(() => resolve(''));
+    rec.start();
+    audio.onended = () => setTimeout(() => rec.stop(), 1200);
+    setTimeout(() => rec.stop(), 180000);
+  });
+}
+
+function renderResult(d) {
+  document.getElementById('pane-summary').innerHTML = `
+    <div class="rbox">
+      <div class="rbox-lbl">회의 요약</div>
+      <div class="rbox-txt">${d.summary || '요약 없음'}</div>
+    </div>`;
+
+  const tags = (d.sentiment_tags || []).map(t =>
+    `<span class="etag ${t.type || 'neutral'}">${t.label}</span>`
+  ).join('');
+  document.getElementById('pane-emotion').innerHTML = `
+    <div class="rbox" style="margin-bottom:10px;">
+      <div class="rbox-lbl">감정 태그</div>
+      <div class="etags">${tags || '<span class="etag neutral">분석 결과 없음</span>'}</div>
+    </div>
+    <div class="rbox">
+      <div class="rbox-lbl">말투 & 분위기</div>
+      <div class="rbox-txt">${d.tone_analysis || '분석 없음'}</div>
+    </div>`;
+
+  document.getElementById('pane-transcript').innerHTML = `
+    <div class="rbox">
+      <div class="rbox-lbl">변환 텍스트</div>
+      <div class="rbox-txt transcript-box">${d.transcript || '(없음)'}</div>
+    </div>`;
+}
+
+// --- Init ---
+loadData();
+</script>
+</body>
+</html>
