@@ -146,32 +146,6 @@
             padding: 8px 0;
         }
 
-        /* 분석 모드 탭 */
-        .mode-tabs {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 14px;
-        }
-        .mode-tab {
-            flex: 1;
-            padding: 10px 6px;
-            border: 1.5px solid #E0E0E0;
-            border-radius: 10px;
-            background: white;
-            font-size: 12px;
-            font-weight: 600;
-            color: #888;
-            cursor: pointer;
-            text-align: center;
-            transition: all 0.15s;
-            -webkit-tap-highlight-color: transparent;
-            line-height: 1.4;
-        }
-        .mode-tab.active {
-            border-color: #1A73E8;
-            color: #1A73E8;
-            background: #E8F0FE;
-        }
 
         /* 녹음 영역 */
         .record-center {
@@ -399,6 +373,30 @@
             line-height: 1.6;
         }
 
+        /* 녹음 파일 재생/저장 */
+        .audio-control-title {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 4px;
+        }
+        #audioPlayer {
+            border-radius: 8px;
+            outline: none;
+        }
+        .save-btn {
+            width: 100%;
+            padding: 12px;
+            border: 1.5px solid #1A73E8;
+            border-radius: 10px;
+            background: white;
+            color: #1A73E8;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .save-btn:active { background: #E8F0FE; }
+
         /* 복사 버튼 */
         .copy-btn {
             margin-top: 14px;
@@ -461,29 +459,21 @@
             <div id="recTimer">00:00</div>
             <div id="statusBox">버튼을 눌러 녹음을 시작하세요.</div>
         </div>
+
+        <!-- 녹음 완료 후 재생/저장 영역 -->
+        <div id="audioControlWrap" style="display:none; margin-top:16px;">
+            <div class="audio-control-title">녹음된 파일</div>
+            <audio id="audioPlayer" controls style="width:100%; margin:8px 0 12px; height:44px;"></audio>
+            <button class="save-btn" onclick="saveAudio()">파일 저장 (다운로드)</button>
+        </div>
     </div>
 
     <!-- 분석 카드 -->
     <div class="card">
-        <div class="card-title">분석 모드 선택</div>
-        <div class="mode-tabs">
-            <div class="mode-tab active" data-mode="dialogue" onclick="setMode('dialogue')">
-                대화록<br><span style="font-weight:400; font-size:11px;">화자 분리</span>
-            </div>
-            <div class="mode-tab" data-mode="summary" onclick="setMode('summary')">
-                요약<br><span style="font-weight:400; font-size:11px;">핵심 정리</span>
-            </div>
-            <div class="mode-tab" data-mode="emotion" onclick="setMode('emotion')">
-                감정<br><span style="font-weight:400; font-size:11px;">분위기 분석</span>
-            </div>
-            <div class="mode-tab" data-mode="full" onclick="setMode('full')">
-                전체<br><span style="font-weight:400; font-size:11px;">모두 포함</span>
-            </div>
-        </div>
+        <div class="card-title">AI 분석</div>
         <button id="analyzeBtn" onclick="runAnalyze()" disabled>분석 실행</button>
-        <div class="tip">
-            회의실 다자간 녹음에 최적화되어 있습니다.<br>
-            <b>전체</b> 모드를 선택하면 대화록·요약·감정을 한 번에 분석합니다.
+        <div class="tip" style="margin-top:12px;">
+            녹음 완료 후 분석하면 대화록·요약·감정 분석 결과를 한 번에 확인할 수 있습니다.
         </div>
     </div>
 
@@ -524,8 +514,8 @@
     let isRecording = false;
     let timerInterval = null;
     let recSeconds = 0;
-    let currentMode = 'dialogue';
     let rawResultText = '';
+    let audioURL = null;
 
     // 화자 색상 라벨
     const SPEAKER_COLORS = ['#1A73E8','#2E7D32','#E65100','#6A1B9A','#00695C','#C62828'];
@@ -547,13 +537,6 @@
         const el = document.getElementById('speakerCount');
         const v  = Math.min(6, Math.max(2, parseInt(el.value) + delta));
         el.value = v;
-    }
-
-    function setMode(mode) {
-        currentMode = mode;
-        document.querySelectorAll('.mode-tab').forEach(t => {
-            t.classList.toggle('active', t.dataset.mode === mode);
-        });
     }
 
     function showResultTab(tab) {
@@ -612,6 +595,13 @@
                     document.getElementById('recordLabel').textContent = '다시 녹음';
                     isRecording = false;
                     setStatus(`녹음 완료 (${(currentBlob.size / 1024).toFixed(1)} KB) — 분석 버튼을 누르세요.`, 'success');
+
+                    // 재생/저장 UI 활성화
+                    if (audioURL) URL.revokeObjectURL(audioURL);
+                    audioURL = URL.createObjectURL(currentBlob);
+                    const player = document.getElementById('audioPlayer');
+                    player.src = audioURL;
+                    document.getElementById('audioControlWrap').style.display = 'block';
                 };
 
                 recorder.start(100);
@@ -695,56 +685,8 @@
         document.getElementById('resultCard').style.display = 'none';
         setStatus('AI가 분석 중입니다...');
 
-        // 모드별 프롬프트 구성
-        const dialoguePrompt = `
-이 음성은 회의실에서 ${spkCnt}명이 나눈 대화입니다.
-각 발화자를 목소리, 말투, 내용 흐름으로 구분하여 아래 형식으로 대화록을 작성해줘.
-반드시 한국어로 작성하고, 각 줄은 반드시 아래 형식을 지켜줘:
-
-화자1: (발화 내용)
-화자2: (발화 내용)
-화자3: (발화 내용)
-
-- 화자 번호는 처음 말한 순서대로 1번부터 부여
-- 한 사람이 연속으로 말하면 같은 화자 번호 유지
-- 불분명하거나 겹치는 구간은 [불명확] 으로 표시
-- 대화록만 출력하고 다른 설명은 쓰지 마`;
-
-        const summaryPrompt = `
-이 음성 대화 내용을 한국어로 요약해줘.
-
-아래 규칙을 반드시 지켜:
-- 화자1, 화자2 같은 화자 표시 없이, 어떤 주제와 내용이 오갔는지만 서술해
-- 누가 말했는지가 아니라, 무슨 내용이 논의됐는지 중심으로 작성
-- 전체 대화의 흐름을 3~5줄로 자연스럽게 요약
-- 주요 키워드나 핵심 주제가 있으면 마지막에 따로 정리
-
-[요약]
-(여기에 요약 내용)
-
-[주요 키워드]
-(핵심 단어 5개 이내, 쉼표로 구분)
-
-[결론 및 액션아이템]
-(논의된 결론이나 다음 행동 항목, 없으면 "없음")`;
-
-        const emotionPrompt = `
-이 음성 대화에서 전체적인 분위기와 감정을 한국어로 분석해줘.
-
-아래 형식으로 출력해:
-
-[전체 분위기]
-(대화 전반의 분위기를 1~2줄로 설명. 예: 긴장감 있는 토론, 우호적인 회의 등)
-
-[화자별 감정]
-화자1: (감정 상태 설명)
-화자2: (감정 상태 설명)
-(화자 수만큼 반복)
-
-[감정 변화 흐름]
-(대화가 진행되면서 분위기나 감정이 어떻게 변했는지 설명)`;
-
-        const fullPrompt = `
+        // 항상 전체 분석 (대화록 + 요약 + 감정)
+        const prompt = `
 이 음성은 회의실에서 ${spkCnt}명이 나눈 대화입니다.
 아래 세 가지를 순서대로 한국어로 작성해줘.
 
@@ -753,30 +695,29 @@
 화자1: (발화 내용)
 화자2: (발화 내용)
 - 화자 번호는 처음 말한 순서대로 1번부터 부여
+- 한 사람이 연속으로 말하면 같은 화자 번호 유지
 - 불분명하거나 겹치는 구간은 [불명확] 으로 표시
+- 대화록 내용만 출력, 다른 설명 없이
 
 ===SUMMARY===
-화자 표시 없이 어떤 내용이 논의됐는지 3~5줄로 요약.
+화자 표시 없이 어떤 내용이 논의됐는지 흐름 중심으로 작성.
 [요약]
-(내용)
+(전체 대화 흐름을 3~5줄로 자연스럽게 서술)
 [주요 키워드]
-(쉼표 구분, 5개 이내)
+(핵심 단어 5개 이내, 쉼표로 구분)
 [결론 및 액션아이템]
-(없으면 "없음")
+(논의된 결론이나 다음 행동 항목, 없으면 "없음")
 
 ===EMOTION===
 [전체 분위기]
-(1~2줄)
+(대화 전반의 분위기를 1~2줄로 설명)
 [화자별 감정]
-화자1: (감정)
-화자2: (감정)
+화자1: (감정 상태)
+화자2: (감정 상태)
+(화자 수만큼 반복)
 [감정 변화 흐름]
-(설명)`;
-
-        const prompt = currentMode === 'dialogue' ? dialoguePrompt
-                     : currentMode === 'summary'  ? summaryPrompt
-                     : currentMode === 'emotion'  ? emotionPrompt
-                     : fullPrompt;
+(대화가 진행되며 분위기나 감정이 어떻게 변했는지)
+`;
 
         try {
             const base64 = await new Promise((resolve, reject) => {
@@ -813,45 +754,18 @@
 
             rawResultText = data.candidates?.[0]?.content?.parts?.[0]?.text || '결과를 가져올 수 없습니다.';
 
-            // 전체 분석 모드: 섹션 파싱
-            let dialogueText = '', summaryText = '', emotionText = '';
+            // 항상 3섹션 파싱
+            const dMatch = rawResultText.match(/===DIALOGUE===([\s\S]*?)(?====SUMMARY===|$)/);
+            const sMatch = rawResultText.match(/===SUMMARY===([\s\S]*?)(?====EMOTION===|$)/);
+            const eMatch = rawResultText.match(/===EMOTION===([\s\S]*?)$/);
 
-            if (currentMode === 'full') {
-                const dMatch = rawResultText.match(/===DIALOGUE===([\s\S]*?)(?====SUMMARY===|$)/);
-                const sMatch = rawResultText.match(/===SUMMARY===([\s\S]*?)(?====EMOTION===|$)/);
-                const eMatch = rawResultText.match(/===EMOTION===([\s\S]*?)$/);
-                dialogueText = dMatch ? dMatch[1].trim() : rawResultText;
-                summaryText  = sMatch ? sMatch[1].trim() : '';
-                emotionText  = eMatch ? eMatch[1].trim() : '';
-            } else if (currentMode === 'dialogue') {
-                dialogueText = rawResultText;
-            } else if (currentMode === 'summary') {
-                summaryText = rawResultText;
-            } else if (currentMode === 'emotion') {
-                emotionText = rawResultText;
-            }
-
-            // 대화록 탭
-            if (dialogueText) {
-                renderDialogue(dialogueText);
-            } else {
-                document.getElementById('dialogueBox').innerHTML =
-                    '<p style="color:#999;font-size:13px;padding:8px 0;">전체 분석 모드를 선택하면 대화록도 함께 표시됩니다.</p>';
-            }
-
-            // 요약 탭
-            renderSummary(summaryText);
-
-            // 감정 탭
-            renderEmotion(emotionText);
+            renderDialogue(dMatch ? dMatch[1].trim() : '');
+            renderSummary(sMatch  ? sMatch[1].trim()  : '');
+            renderEmotion(eMatch  ? eMatch[1].trim()  : '');
 
             document.getElementById('modelBadge').textContent = model;
             document.getElementById('resultCard').style.display = 'block';
-
-            // 기본 탭 결정
-            if (currentMode === 'dialogue' || currentMode === 'full') showResultTab('dialogue');
-            else if (currentMode === 'summary') showResultTab('summary');
-            else showResultTab('emotion');
+            showResultTab('dialogue');
 
             document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
             setStatus('분석이 완료되었습니다.', 'success');
@@ -869,7 +783,7 @@
     function renderSummary(text) {
         const box = document.getElementById('summaryBox');
         if (!text) {
-            box.innerHTML = '<p style="color:#999;font-size:13px;padding:8px 0;">전체 분석 모드를 선택하면 요약도 함께 표시됩니다.</p>';
+            box.innerHTML = '<p style="color:#999;font-size:13px;padding:8px 0;">요약 결과가 없습니다.</p>';
             return;
         }
         box.textContent = text;
@@ -879,7 +793,7 @@
     function renderEmotion(text) {
         const box = document.getElementById('emotionBox');
         if (!text) {
-            box.innerHTML = '<p style="color:#999;font-size:13px;padding:8px 0;">전체 분석 모드를 선택하면 감정 분석도 함께 표시됩니다.</p>';
+            box.innerHTML = '<p style="color:#999;font-size:13px;padding:8px 0;">감정 분석 결과가 없습니다.</p>';
             return;
         }
 
@@ -910,6 +824,18 @@
         if (box.children.length === 0) {
             box.textContent = text;
         }
+    }
+
+    function saveAudio() {
+        if (!currentBlob) return;
+        const ext  = currentBlob.type.includes('mp4') ? 'mp4' : 'webm';
+        const now  = new Date();
+        const ts   = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+        const name = `녹음_${ts}.${ext}`;
+        const a    = document.createElement('a');
+        a.href     = audioURL;
+        a.download = name;
+        a.click();
     }
 
     function copyResult() {
