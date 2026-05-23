@@ -5,52 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI 회의 분석 앱 - 녹음 테스트</title>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-top: 50px;
-            background-color: #f5f7f9;
-        }
-        .container {
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            text-align: center;
-            width: 300px;
-        }
-        button {
-            padding: 10px 20px;
-            margin: 10px 5px;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        #recordBtn {
-            background-color: #e74c3c;
-            color: white;
-        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; margin-top: 50px; background-color: #f5f7f9; }
+        .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; width: 300px; }
+        button { padding: 10px 20px; margin: 10px 5px; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; transition: background-color 0.2s; }
+        #recordBtn { background-color: #e74c3c; color: white; }
         #recordBtn:disabled { background-color: #f1948a; cursor: not-allowed; }
-        
-        #stopBtn {
-            background-color: #34495e;
-            color: white;
-        }
+        #stopBtn { background-color: #34495e; color: white; }
         #stopBtn:disabled { background-color: #85929e; cursor: not-allowed; }
-        
-        #audioPlayback {
-            margin-top: 20px;
-            width: 100%;
-        }
-        #status {
-            margin-top: 15px;
-            font-weight: bold;
-            color: #2c3e50;
-        }
+        #audioPlayback { margin-top: 20px; width: 100%; }
+        #status { margin-top: 15px; font-weight: bold; color: #2c3e50; font-size: 14px; word-break: keep-all; }
     </style>
 </head>
 <body>
@@ -62,7 +25,6 @@
         
         <div id="status">대기 중...</div>
         
-        <!-- 녹음된 파일을 재생할 오디오 플레이어 -->
         <audio id="audioPlayback" controls></audio>
     </div>
 
@@ -75,57 +37,48 @@
         let mediaRecorder;
         let audioChunks = [];
 
-        // 마이크 권한 요청 및 초기화 함수
-        async function setupAudio() {
+        // 녹음 시작 버튼을 눌렀을 때만 마이크 권한을 요청하도록 변경
+        recordBtn.addEventListener('click', async () => {
             try {
-                // 브라우저에 마이크 사용 권한 요청
+                statusText.innerText = "마이크 권한을 요청 중입니다...";
+                
+                // 1. 버튼을 클릭한 순간 마이크 권한 요청
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 
-                // MediaRecorder 객체 생성
+                // 2. 녹음기 세팅
                 mediaRecorder = new MediaRecorder(stream);
+                audioChunks = []; // 배열 초기화
 
-                // 녹음 데이터가 생성될 때마다 배열에 저장
                 mediaRecorder.ondataavailable = event => {
                     audioChunks.push(event.data);
                 };
 
-                // 녹음이 완전히 종료되었을 때 실행되는 동작
                 mediaRecorder.onstop = () => {
-                    // 저장된 오디오 조각들을 하나의 파일(Blob)로 합침
                     const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    
-                    // 화면의 오디오 플레이어에 파일 연결
                     const audioUrl = URL.createObjectURL(audioBlob);
                     audioPlayback.src = audioUrl;
                     
-                    // 다음 녹음을 위해 배열 초기화
-                    audioChunks = [];
                     statusText.innerText = "녹음 완료! 재생해 보세요.";
+                    
+                    // 브라우저 탭에 떠있는 빨간 녹음 아이콘(마이크 사용 중)을 확실히 꺼주는 코드
+                    stream.getTracks().forEach(track => track.stop());
                 };
 
-            } catch (error) {
-                console.error("마이크 접근 오류:", error);
-                statusText.innerText = "마이크 권한을 허용해주세요.";
-            }
-        }
+                // 3. 세팅이 끝나면 바로 녹음 시작
+                mediaRecorder.start();
+                statusText.innerText = "녹음 중입니다...";
+                statusText.style.color = "#e74c3c";
+                recordBtn.disabled = true;
+                stopBtn.disabled = false;
 
-        // '녹음 시작' 버튼 클릭 이벤트
-        recordBtn.addEventListener('click', () => {
-            if (!mediaRecorder) setupAudio(); // 첫 클릭 시 초기화
-            
-            // setupAudio()는 비동기이므로 약간의 지연 후 실행 처리
-            setTimeout(() => {
-                if (mediaRecorder && mediaRecorder.state === "inactive") {
-                    mediaRecorder.start();
-                    statusText.innerText = "녹음 중입니다...";
-                    statusText.style.color = "#e74c3c";
-                    recordBtn.disabled = true;
-                    stopBtn.disabled = false;
-                }
-            }, 500);
+            } catch (error) {
+                console.error("마이크 오류:", error);
+                // 모바일이나 특정 브라우저에서 권한이 거부되었을 때의 안내 문구
+                statusText.innerText = "마이크를 사용할 수 없습니다. 주소창 왼쪽의 자물쇠 아이콘을 눌러 권한을 허용해 주세요.";
+                statusText.style.color = "#c0392b";
+            }
         });
 
-        // '녹음 중지' 버튼 클릭 이벤트
         stopBtn.addEventListener('click', () => {
             if (mediaRecorder && mediaRecorder.state === "recording") {
                 mediaRecorder.stop();
@@ -134,9 +87,6 @@
                 stopBtn.disabled = true;
             }
         });
-
-        // 페이지 로드 시 바로 마이크 세팅 시도
-        setupAudio();
     </script>
 </body>
 </html>
