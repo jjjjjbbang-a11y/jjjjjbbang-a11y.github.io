@@ -3,126 +3,146 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 회의 분석 앱 - 녹음 테스트</title>
+    <title>AI 회의 분석 앱 - STT 테스트</title>
     <style>
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            margin-top: 50px; 
-            background-color: #f5f7f9; 
-        }
-        .container { 
-            background: white; 
-            padding: 30px; 
-            border-radius: 12px; 
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
-            text-align: center; 
-            width: 300px; 
-        }
-        button { 
-            padding: 10px 20px; 
-            margin: 10px 5px; 
-            border: none; 
-            border-radius: 6px; 
-            font-size: 16px; 
-            cursor: pointer; 
-            transition: background-color 0.2s; 
-        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; margin-top: 50px; background-color: #f5f7f9; }
+        .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; width: 400px; }
+        button { padding: 10px 20px; margin: 10px 5px; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; transition: background-color 0.2s; }
         #recordBtn { background-color: #e74c3c; color: white; }
         #recordBtn:disabled { background-color: #f1948a; cursor: not-allowed; }
-        
         #stopBtn { background-color: #34495e; color: white; }
         #stopBtn:disabled { background-color: #85929e; cursor: not-allowed; }
-        
+        #analyzeBtn { background-color: #27ae60; color: white; width: 100%; margin-top: 15px; }
+        #analyzeBtn:disabled { background-color: #a9dfbf; cursor: not-allowed; }
         #audioPlayback { margin-top: 20px; width: 100%; }
+        #status { margin-top: 15px; font-weight: bold; color: #2c3e50; }
         
-        #status { 
-            margin-top: 15px; 
-            font-weight: bold; 
-            color: #2c3e50; 
-            font-size: 14px; 
-            word-break: keep-all; 
-        }
-        
-        /* 버전 표시용 스타일 */
-        .version-tag {
-            margin-top: 25px;
-            font-size: 12px;
-            color: #95a5a6;
-        }
+        /* 대본이 표시될 영역 스타일 */
+        .transcript-box { margin-top: 20px; padding: 15px; background-color: #fdfefe; border: 1px solid #d5dbdb; border-radius: 8px; text-align: left; max-height: 200px; overflow-y: auto; font-size: 14px; line-height: 1.6; }
+        .speaker-A { color: #2980b9; font-weight: bold; }
+        .speaker-B { color: #d35400; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h2>음성 녹음 테스트</h2>
+        <h2>음성 녹음 & AI 분석</h2>
         <button id="recordBtn">🔴 녹음 시작</button>
         <button id="stopBtn" disabled>⬛ 녹음 중지</button>
         
-        <div id="status">대기 중...</div>
-        
         <audio id="audioPlayback" controls></audio>
-        
-        <div class="version-tag">v1.1</div>
+        <div id="status">대기 중...</div>
+
+        <!-- 새롭게 추가된 분석 버튼과 대본 영역 -->
+        <button id="analyzeBtn" disabled>✨ AI로 화자 분리 및 텍스트 변환</button>
+        <div id="transcriptBox" class="transcript-box" style="display: none;">
+            <!-- 이곳에 텍스트가 채워집니다 -->
+        </div>
     </div>
 
     <script>
         const recordBtn = document.getElementById('recordBtn');
         const stopBtn = document.getElementById('stopBtn');
+        const analyzeBtn = document.getElementById('analyzeBtn');
         const audioPlayback = document.getElementById('audioPlayback');
         const statusText = document.getElementById('status');
+        const transcriptBox = document.getElementById('transcriptBox');
 
         let mediaRecorder;
         let audioChunks = [];
+        let currentAudioBlob = null; // 녹음된 파일을 담아둘 변수
 
-        recordBtn.addEventListener('click', async () => {
+        async function setupAudio() {
             try {
-                statusText.innerText = "마이크 권한을 요청 중입니다...";
-                
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(stream);
-                audioChunks = []; 
 
                 mediaRecorder.ondataavailable = event => {
-                    if (event.data.size > 0) {
-                        audioChunks.push(event.data);
-                    }
+                    audioChunks.push(event.data);
                 };
 
                 mediaRecorder.onstop = () => {
-                    // 아이폰(Safari)을 포함해 어떤 브라우저든 가장 기본이 되는 포맷으로 자동 설정하도록 보완
-                    const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/mp4' });
-                    const audioUrl = URL.createObjectURL(audioBlob);
-                    audioPlayback.src = audioUrl;
+                    currentAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    audioPlayback.src = URL.createObjectURL(currentAudioBlob);
+                    audioChunks = [];
+                    statusText.innerText = "녹음 완료! 분석을 시작할 수 있어.";
                     
-                    statusText.innerText = "녹음 완료! 재생해 보세요.";
-                    
-                    stream.getTracks().forEach(track => track.stop());
+                    // 녹음이 끝나면 분석 버튼 활성화
+                    analyzeBtn.disabled = false;
                 };
-
-                mediaRecorder.start();
-                statusText.innerText = "녹음 중입니다...";
-                statusText.style.color = "#e74c3c";
-                recordBtn.disabled = true;
-                stopBtn.disabled = false;
-
             } catch (error) {
-                console.error("마이크 오류:", error);
-                statusText.innerText = "마이크를 사용할 수 없습니다. 권한을 허용해 주세요.";
-                statusText.style.color = "#c0392b";
+                console.error("마이크 접근 오류:", error);
+                statusText.innerText = "마이크 권한을 허용해줘.";
             }
+        }
+
+        recordBtn.addEventListener('click', () => {
+            if (!mediaRecorder) setupAudio();
+            setTimeout(() => {
+                if (mediaRecorder && mediaRecorder.state === "inactive") {
+                    mediaRecorder.start();
+                    statusText.innerText = "녹음 중입니다...";
+                    recordBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    analyzeBtn.disabled = true; // 녹음 중에는 분석 버튼 비활성화
+                    transcriptBox.style.display = "none";
+                }
+            }, 500);
         });
 
         stopBtn.addEventListener('click', () => {
             if (mediaRecorder && mediaRecorder.state === "recording") {
                 mediaRecorder.stop();
-                statusText.style.color = "#2c3e50";
                 recordBtn.disabled = false;
                 stopBtn.disabled = true;
             }
         });
+
+        // ✨ 핵심: API로 오디오를 보내고 대본을 받아오는 기능
+        analyzeBtn.addEventListener('click', async () => {
+            if (!currentAudioBlob) return;
+
+            statusText.innerText = "AI가 목소리를 구분하고 텍스트로 변환 중이야... ⏳";
+            analyzeBtn.disabled = true;
+            transcriptBox.style.display = "block";
+            transcriptBox.innerHTML = "<span style='color:#7f8c8d;'>데이터 전송 및 분석 대기 중...</span>";
+
+            /* 
+            ====================================================================
+            [실제 API 연동 시 사용할 코드 형태]
+            실제 서비스에서는 이곳에 AssemblyAI나 Google Cloud API 호출 코드가 들어갑니다.
+            
+            const formData = new FormData();
+            formData.append('audio', currentAudioBlob); // 녹음 파일 담기
+            
+            try {
+                const response = await fetch('YOUR_BACKEND_API_URL', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                // result.words 배열을 돌면서 화자에 따라 텍스트를 화면에 뿌려줌
+            } catch(e) {
+                console.error("API 통신 에러");
+            }
+            ====================================================================
+            */
+
+            // 지금은 동작을 확인하기 위해 API 응답이 3초 뒤에 온 것처럼 '가상(Mock)'으로 처리할게.
+            setTimeout(() => {
+                const dummyTranscript = `
+                    <p><span class="speaker-A">화자 A (준배):</span> 이번 달 태블릿 AS 입고량이 좀 늘었네요. 현황 파악 되셨나요?</p>
+                    <p><span class="speaker-B">화자 B (승철):</span> 네, 전원 불량 건이 많습니다. 현재 수리 완료율은 85% 정도입니다.</p>
+                    <p><span class="speaker-A">화자 A (준배):</span> 알겠습니다. 관련 데이터 정리해서 대시보드에 반영해 두죠.</p>
+                `;
+                
+                transcriptBox.innerHTML = dummyTranscript;
+                statusText.innerText = "분석 완료! 여러 사람의 목소리가 텍스트로 분리되었어.";
+                analyzeBtn.disabled = false;
+            }, 3000);
+        });
+
+        setupAudio();
     </script>
 </body>
 </html>
