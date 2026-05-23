@@ -29,7 +29,7 @@
     </div>
 
     <script>
-        const recordBtn = document.getElementById('recordBtn');
+const recordBtn = document.getElementById('recordBtn');
         const stopBtn = document.getElementById('stopBtn');
         const audioPlayback = document.getElementById('audioPlayback');
         const statusText = document.getElementById('status');
@@ -37,34 +37,29 @@
         let mediaRecorder;
         let audioChunks = [];
 
-        // 녹음 시작 버튼을 눌렀을 때만 마이크 권한을 요청하도록 변경
         recordBtn.addEventListener('click', async () => {
             try {
                 statusText.innerText = "마이크 권한을 요청 중입니다...";
                 
-                // 1. 버튼을 클릭한 순간 마이크 권한 요청
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                
-                // 2. 녹음기 세팅
                 mediaRecorder = new MediaRecorder(stream);
-                audioChunks = []; // 배열 초기화
+                audioChunks = []; 
 
                 mediaRecorder.ondataavailable = event => {
                     audioChunks.push(event.data);
                 };
 
                 mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    // 💡 핵심 수정 부분: 브라우저 환경에 맞는 파일 형식 자동 지정
+                    const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
                     const audioUrl = URL.createObjectURL(audioBlob);
                     audioPlayback.src = audioUrl;
                     
                     statusText.innerText = "녹음 완료! 재생해 보세요.";
                     
-                    // 브라우저 탭에 떠있는 빨간 녹음 아이콘(마이크 사용 중)을 확실히 꺼주는 코드
                     stream.getTracks().forEach(track => track.stop());
                 };
 
-                // 3. 세팅이 끝나면 바로 녹음 시작
                 mediaRecorder.start();
                 statusText.innerText = "녹음 중입니다...";
                 statusText.style.color = "#e74c3c";
@@ -73,8 +68,7 @@
 
             } catch (error) {
                 console.error("마이크 오류:", error);
-                // 모바일이나 특정 브라우저에서 권한이 거부되었을 때의 안내 문구
-                statusText.innerText = "마이크를 사용할 수 없습니다. 주소창 왼쪽의 자물쇠 아이콘을 눌러 권한을 허용해 주세요.";
+                statusText.innerText = "마이크를 사용할 수 없습니다. 권한을 허용해 주세요.";
                 statusText.style.color = "#c0392b";
             }
         });
