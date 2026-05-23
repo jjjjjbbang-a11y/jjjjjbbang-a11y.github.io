@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 회의 분석 앱 v1.5</title>
+    <title>AI 회의 분석 앱 v1.6 (최종)</title>
     <style>
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
@@ -23,13 +23,13 @@
             width: 320px; 
         }
         .version-badge {
-            background-color: #e67e22; /* 주황색으로 변경 */
+            background-color: #16a085; /* 최종 완성은 민트색으로! */
             color: white;
-            padding: 4px 8px;
+            padding: 4px 10px;
             border-radius: 12px;
-            font-size: 12px;
+            font-size: 13px;
             font-weight: bold;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
             display: inline-block;
         }
         button { 
@@ -60,13 +60,24 @@
         #analyzeBtn { background-color: #27ae60; color: white; width: 100%; margin-top: 20px; display: none; }
         #analyzeBtn:disabled { background-color: #a9dfbf; cursor: not-allowed; }
         
-        /* 4단계 추가: 음성 톤 분석 버튼 및 박스 */
         #emotionBtn { background-color: #d35400; color: white; width: 100%; margin-top: 15px; display: none; }
         #emotionBtn:disabled { background-color: #edbb99; cursor: not-allowed; }
         .emotion-box { background-color: #fdf2e9; border-color: #edbb99; }
 
         #summarizeBtn { background-color: #8e44ad; color: white; width: 100%; margin-top: 15px; display: none; }
         #summarizeBtn:disabled { background-color: #d2b4de; cursor: not-allowed; }
+
+        /* 5단계 추가: 결과 다운로드 버튼 */
+        #downloadBtn { 
+            background-color: #2980b9; 
+            color: white; 
+            width: 100%; 
+            margin-top: 25px; 
+            display: none; 
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(41, 128, 185, 0.3);
+        }
+        #downloadBtn:hover { background-color: #2471a3; }
 
         .data-box { 
             margin-top: 20px; 
@@ -83,20 +94,20 @@
         .summary-box { background-color: #f5eef8; border-color: #d7bde2; } 
         
         .speaker-A { color: #2980b9; font-weight: bold; }
-        .speaker-B { color: #27ae60; font-weight: bold; } /* 개발자 색상을 초록색으로 변경 */
+        .speaker-B { color: #27ae60; font-weight: bold; }
         .keyword { font-weight: bold; color: #d35400; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <div class="version-badge">버전 1.5 (음성 톤 감정 분석)</div>
-        <h2>AI 회의 비서</h2>
+        <div class="version-badge">🏆 버전 1.6 (최종 완성본)</div>
+        <h2>나만의 AI 회의 비서</h2>
         
         <button id="recordBtn">🔴 녹음 시작</button>
         <button id="stopBtn" disabled>⬛ 녹음 중지</button>
         
-        <div id="status">대기 중...</div>
+        <div id="status">회의를 녹음해 보세요.</div>
         
         <audio id="audioPlayback" controls></audio>
 
@@ -108,6 +119,8 @@
 
         <button id="summarizeBtn">📝 회의 요약 및 맥락 분석</button>
         <div id="summaryBox" class="data-box summary-box"></div>
+
+        <button id="downloadBtn">💾 회의 기록 다운로드 (.txt)</button>
     </div>
 
     <script>
@@ -125,11 +138,12 @@
         const summarizeBtn = document.getElementById('summarizeBtn');
         const summaryBox = document.getElementById('summaryBox');
 
+        const downloadBtn = document.getElementById('downloadBtn');
+
         let mediaRecorder;
         let audioChunks = [];
         let currentAudioBlob = null;
 
-        // [1단계] 녹음
         recordBtn.addEventListener('click', async () => {
             try {
                 statusText.innerText = "마이크 권한 요청 중...";
@@ -146,7 +160,7 @@
                     currentAudioBlob = new Blob(audioChunks, { type: mimeType });
                     audioPlayback.src = URL.createObjectURL(currentAudioBlob);
                     
-                    statusText.innerText = "녹음 완료!";
+                    statusText.innerText = "녹음 완료! 분석을 시작하세요.";
                     analyzeBtn.style.display = "block";
                     analyzeBtn.disabled = false;
                     
@@ -156,6 +170,7 @@
                     emotionBox.style.display = "none";
                     summarizeBtn.style.display = "none";
                     summaryBox.style.display = "none";
+                    downloadBtn.style.display = "none"; // 다운로드 버튼 숨기기
                     
                     stream.getTracks().forEach(track => track.stop());
                 };
@@ -182,10 +197,8 @@
             }
         });
 
-        // [2단계] STT 변환
         analyzeBtn.addEventListener('click', () => {
             if (!currentAudioBlob) return;
-
             statusText.innerText = "텍스트 변환 중... ⏳";
             analyzeBtn.disabled = true;
             transcriptBox.style.display = "block";
@@ -194,58 +207,96 @@
             setTimeout(() => {
                 transcriptBox.innerHTML = `
                     <p><span class="speaker-A">화자 A (팀장):</span> 이번 앱 개발, 어디까지 진행됐나요?</p>
-                    <p><span class="speaker-B">화자 B (개발자):</span> 방금 아이폰 사파리 오류를 잡고 2단계 테스트 중입니다.</p>
-                    <p><span class="speaker-A">화자 A (팀장):</span> 고생하셨네요! 확인 끝나면 다음 단계로 바로 넘어가시죠.</p>
+                    <p><span class="speaker-B">화자 B (개발자):</span> 방금 아이폰 사파리 오류를 잡고 최종 단계를 완성했습니다.</p>
+                    <p><span class="speaker-A">화자 A (팀장):</span> 수고하셨습니다. 회의록 다운로드까지 잘 되는지 확인해 주세요.</p>
                 `;
                 statusText.innerText = "✨ 변환 완료! 분석을 진행해 보세요.";
                 
-                // STT가 끝나면 음성 감정 분석, 요약 버튼 둘 다 활성화
                 emotionBtn.style.display = "block";
                 emotionBtn.disabled = false;
                 summarizeBtn.style.display = "block";
                 summarizeBtn.disabled = false;
+                
+                // 텍스트 변환이 완료되면 다운로드 버튼도 활성화
+                downloadBtn.style.display = "block";
             }, 2000);
         });
 
-        // [4단계] 물리적 음성 톤 및 억양 분석
         emotionBtn.addEventListener('click', () => {
-            statusText.innerText = "음파의 높낮이와 속도를 분석 중입니다... 📊";
+            statusText.innerText = "음성 분석 중... 📊";
             emotionBtn.disabled = true;
             emotionBox.style.display = "block";
-            emotionBox.innerHTML = "<span style='color:#7f8c8d;'>AI 오디오 분석 모델 가동 중... (약 2초)</span>";
-
-            /* 실제 연동 시: 오디오 파일을 Hume AI 등 감정 분석 API로 전송 */
+            emotionBox.innerHTML = "<span style='color:#7f8c8d;'>AI 오디오 분석 중...</span>";
 
             setTimeout(() => {
                 emotionBox.innerHTML = `
                     <h3 style="margin-top:0; color:#d35400;">📊 음성 파형 분석 결과</h3>
-                    <p>🔊 <span class="speaker-A">화자 A:</span> 말하는 속도가 평소보다 15% 빠르고, 문장 끝의 피치(Pitch)가 올라갑니다. <span class="keyword">[기대감 / 긍정적 흥분]</span> 상태로 분석됩니다.</p>
-                    <p>🔉 <span class="speaker-B">화자 B:</span> 일정한 데시벨(dB)과 안정적인 주파수(Hz)를 유지하고 있습니다. <span class="keyword">[차분함 / 집중]</span> 상태로 분석됩니다.</p>
+                    <p>🔊 화자 A: 피치(Pitch) 상승. [기대감 / 만족]</p>
+                    <p>🔉 화자 B: 안정적인 주파수. [차분함 / 성취감]</p>
                 `;
                 statusText.innerText = "🎧 음성 톤 분석 완료!";
                 emotionBtn.disabled = false;
             }, 2500);
         });
 
-        // [3단계] 텍스트 기반 요약 및 맥락 분석
         summarizeBtn.addEventListener('click', () => {
-            statusText.innerText = "AI가 대화의 맥락을 요약 중입니다... 🧠";
+            statusText.innerText = "맥락 요약 중... 🧠";
             summarizeBtn.disabled = true;
             summaryBox.style.display = "block";
-            summaryBox.innerHTML = "<span style='color:#7f8c8d;'>LLM 서버에서 요약 중... (약 2초)</span>";
+            summaryBox.innerHTML = "<span style='color:#7f8c8d;'>LLM 요약 중...</span>";
 
             setTimeout(() => {
                 summaryBox.innerHTML = `
                     <h3 style="margin-top:0; color:#2c3e50;">📌 회의 요약 노트</h3>
                     <ul style="padding-left: 20px; margin-bottom: 0;">
-                        <li><b>주제:</b> 앱 개발 진행 상황 점검</li>
-                        <li><b>현황:</b> 아이폰 브라우저 오류 해결 후 2단계 진행 중</li>
-                        <li><b>다음 할 일:</b> 2단계 확인 후 3단계 신속히 착수</li>
+                        <li><b>주제:</b> 최종 앱 개발 완료 보고</li>
+                        <li><b>현황:</b> 5단계 완성 및 오류 수정 완료</li>
+                        <li><b>결론:</b> 회의록 다운로드 기능 테스트 진행</li>
                     </ul>
                 `;
                 statusText.innerText = "🧠 AI 회의 분석 완료!";
                 summarizeBtn.disabled = false;
             }, 2000);
+        });
+
+        // 5단계: 화면에 있는 내용을 텍스트 파일로 만들어서 다운로드하는 기능
+        downloadBtn.addEventListener('click', () => {
+            let resultText = "====== AI 회의 비서 기록 ======\n\n";
+            
+            // 텍스트 대본 추출 (HTML 태그 제거하고 순수 텍스트만 가져오기)
+            if (transcriptBox.style.display === "block") {
+                resultText += "[회의 대본]\n";
+                resultText += transcriptBox.innerText + "\n\n";
+            }
+            
+            // 감정 분석 결과 추출
+            if (emotionBox.style.display === "block") {
+                resultText += "[음성 톤 분석 결과]\n";
+                resultText += emotionBox.innerText + "\n\n";
+            }
+            
+            // 요약 추출
+            if (summaryBox.style.display === "block") {
+                resultText += "[회의 요약 노트]\n";
+                resultText += summaryBox.innerText + "\n\n";
+            }
+            
+            // 파일 생성 및 다운로드 처리
+            const blob = new Blob([resultText], { type: 'text/plain;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            
+            // 오늘 날짜로 파일명 만들기 (예: AI_회의기록_20231025.txt)
+            const today = new Date();
+            const dateStr = today.getFullYear() + String(today.getMonth() + 1).padStart(2, '0') + String(today.getDate()).padStart(2, '0');
+            link.download = `AI_회의기록_${dateStr}.txt`;
+            
+            // 가상의 링크를 클릭하게 만들어서 다운로드 실행
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            statusText.innerText = "💾 회의 기록이 다운로드되었습니다!";
         });
     </script>
 </body>
