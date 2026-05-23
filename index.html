@@ -318,7 +318,7 @@
             word-break: keep-all;
         }
 
-        /* 화자별 색상 (최대 6명) */
+        /* 화자별 색상 (최대 10명) */
         .spk-0 .speaker-name { color: #1A73E8; }
         .spk-0 .bubble { background: #E8F0FE; color: #0D47A1; border-radius: 4px 16px 16px 16px; }
 
@@ -339,6 +339,20 @@
         .spk-5 .speaker-name { color: #C62828; }
         .spk-5 .bubble { background: #FFEBEE; color: #B71C1C; border-radius: 16px 4px 16px 16px; align-self: flex-end; }
         .spk-5 { align-items: flex-end; }
+
+        .spk-6 .speaker-name { color: #0277BD; }
+        .spk-6 .bubble { background: #E1F5FE; color: #01579B; border-radius: 4px 16px 16px 16px; }
+
+        .spk-7 .speaker-name { color: #558B2F; }
+        .spk-7 .bubble { background: #F1F8E9; color: #33691E; border-radius: 16px 4px 16px 16px; align-self: flex-end; }
+        .spk-7 { align-items: flex-end; }
+
+        .spk-8 .speaker-name { color: #AD1457; }
+        .spk-8 .bubble { background: #FCE4EC; color: #880E4F; border-radius: 4px 16px 16px 16px; }
+
+        .spk-9 .speaker-name { color: #4527A0; }
+        .spk-9 .bubble { background: #EDE7F6; color: #311B92; border-radius: 16px 4px 16px 16px; align-self: flex-end; }
+        .spk-9 { align-items: flex-end; }
 
         /* 요약/감정 영역 */
         #summaryBox, #emotionBox {
@@ -441,10 +455,10 @@
             <label>회의 참여 인원</label>
             <div class="speaker-count-wrap">
                 <button onclick="changeSpeaker(-1)">-</button>
-                <input type="number" id="speakerCount" value="2" min="2" max="6" readonly>
+                <input type="number" id="speakerCount" value="2" min="2" max="10" readonly>
                 <button onclick="changeSpeaker(1)">+</button>
             </div>
-            <span style="font-size:12px; color:#888;">명 (최대 6)</span>
+            <span style="font-size:12px; color:#888;">명 (최대 10)</span>
         </div>
     </div>
 
@@ -518,7 +532,7 @@
     let audioURL = null;
 
     // 화자 색상 라벨
-    const SPEAKER_COLORS = ['#1A73E8','#2E7D32','#E65100','#6A1B9A','#00695C','#C62828'];
+    const SPEAKER_COLORS = ['#1A73E8','#2E7D32','#E65100','#6A1B9A','#00695C','#C62828','#0277BD','#558B2F','#AD1457','#4527A0'];
 
     function setStatus(msg, type = '') {
         const box = document.getElementById('statusBox');
@@ -535,7 +549,7 @@
 
     function changeSpeaker(delta) {
         const el = document.getElementById('speakerCount');
-        const v  = Math.min(6, Math.max(2, parseInt(el.value) + delta));
+        const v  = Math.min(10, Math.max(2, parseInt(el.value) + delta));
         el.value = v;
     }
 
@@ -647,7 +661,7 @@
             if (!(rawName in speakerMap)) {
                 speakerMap[rawName] = spkIdx++;
             }
-            const idx = speakerMap[rawName] % 6;
+            const idx = speakerMap[rawName] % 10;
 
             const div = document.createElement('div');
             div.className = `dialogue-line spk-${idx}`;
