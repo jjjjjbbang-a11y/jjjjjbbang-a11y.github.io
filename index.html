@@ -478,7 +478,7 @@
         <div id="audioControlWrap" style="display:none; margin-top:16px;">
             <div class="audio-control-title">녹음된 파일</div>
             <audio id="audioPlayer" controls style="width:100%; margin:8px 0 12px; height:44px;"></audio>
-            <button class="save-btn" onclick="saveAudio()">파일 저장 (다운로드)</button>
+            <button class="save-btn" onclick="saveAudio()">파일 저장 (.m4a)</button>
         </div>
     </div>
 
@@ -842,10 +842,10 @@
 
     function saveAudio() {
         if (!currentBlob) return;
-        const ext  = currentBlob.type.includes('mp4') ? 'mp4' : 'webm';
+        
         const now  = new Date();
         const ts   = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
-        const name = `녹음_${ts}.${ext}`;
+        const name = `녹음_${ts}.m4a`;
         const a    = document.createElement('a');
         a.href     = audioURL;
         a.download = name;
