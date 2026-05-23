@@ -1,556 +1,142 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="회의 녹음">
-<title>회의 녹음기</title>
-<style>
-  :root {
-    --bg: #f5f4f0;
-    --surface: #ffffff;
-    --surface2: #f0ede8;
-    --text: #1a1a18;
-    --text2: #6b6a66;
-    --text3: #9e9d99;
-    --border: rgba(0,0,0,0.10);
-    --border2: rgba(0,0,0,0.18);
-    --accent: #d94f3d;
-    --accent-light: #faeae8;
-    --accent-dark: #a33228;
-    --info: #1a6fb5;
-    --info-light: #e6f0fa;
-    --success: #2a7a4b;
-    --success-light: #e6f5ed;
-    --warn: #a06000;
-    --warn-light: #fef3e0;
-    --radius: 12px;
-    --radius-sm: 8px;
-    --shadow: 0 2px 12px rgba(0,0,0,0.08);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #1a1a18;
-      --surface: #242422;
-      --surface2: #2e2e2b;
-      --text: #f0efe9;
-      --text2: #a09f9a;
-      --text3: #6b6a66;
-      --border: rgba(255,255,255,0.10);
-      --border2: rgba(255,255,255,0.18);
-      --accent-light: #3d1a16;
-      --info-light: #0e2d4a;
-      --success-light: #0d2d1e;
-      --warn-light: #2d1e00;
-    }
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  body {
-    font-family: -apple-system, 'Helvetica Neue', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-  }
-  .topbar {
-    background: var(--surface);
-    border-bottom: 0.5px solid var(--border);
-    padding: 16px 20px 12px;
-    padding-top: calc(16px + env(safe-area-inset-top, 0px));
-    position: sticky; top: 0; z-index: 100;
-  }
-  .topbar h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
-  .topbar p { font-size: 12px; color: var(--text2); margin-top: 2px; }
-  .main { padding: 16px; max-width: 480px; margin: 0 auto; }
-  .card {
-    background: var(--surface);
-    border-radius: var(--radius);
-    border: 0.5px solid var(--border);
-    padding: 16px;
-    margin-bottom: 12px;
-    box-shadow: var(--shadow);
-  }
-  .card-label {
-    font-size: 11px; font-weight: 600; color: var(--text3);
-    text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px;
-  }
-  .name-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
-  .name-row label { font-size: 13px; color: var(--text2); }
-  .name-row input {
-    width: 100%; padding: 10px 12px; font-size: 15px;
-    border-radius: var(--radius-sm); border: 1px solid var(--border2);
-    background: var(--surface2); color: var(--text); outline: none;
-  }
-  .name-row input:focus { border-color: var(--accent); }
-  .rec-center { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 8px 0 4px; }
-  .visualizer { width: 100%; height: 44px; border-radius: var(--radius-sm); background: var(--surface2); display: block; }
-  .timer { font-size: 36px; font-weight: 300; letter-spacing: 2px; color: var(--text); font-variant-numeric: tabular-nums; }
-  .status-row { display: flex; align-items: center; gap: 6px; height: 22px; }
-  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text3); }
-  .dot.live { background: var(--accent); animation: blink 1s infinite; }
-  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.25} }
-  .status-txt { font-size: 13px; color: var(--text2); }
-  .rec-btn {
-    width: 76px; height: 76px; border-radius: 50%; border: none;
-    background: var(--accent); display: flex; align-items: center; justify-content: center;
-    cursor: pointer; transition: transform 0.15s, background 0.2s;
-    box-shadow: 0 4px 16px rgba(217,79,61,0.35);
-  }
-  .rec-btn:active { transform: scale(0.94); }
-  .rec-btn.recording { background: var(--accent-dark); animation: pulse 1.4s infinite; }
-  @keyframes pulse { 0%,100%{box-shadow:0 4px 16px rgba(217,79,61,0.35)} 50%{box-shadow:0 4px 28px rgba(217,79,61,0.6)} }
-  .rec-btn svg { width: 30px; height: 30px; }
-  .btn-row { display: flex; gap: 8px; width: 100%; }
-  .ctrl-btn {
-    flex: 1; padding: 10px; font-size: 13px;
-    border-radius: var(--radius-sm); border: 1px solid var(--border2);
-    background: var(--surface2); color: var(--text); cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 6px;
-    transition: background 0.15s;
-  }
-  .ctrl-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-  .ctrl-btn:not(:disabled):active { background: var(--border); }
-  .rec-list { display: flex; flex-direction: column; gap: 8px; }
-  .empty { font-size: 13px; color: var(--text3); text-align: center; padding: 20px 0; }
-  .rec-item {
-    display: flex; align-items: center; gap: 10px;
-    background: var(--surface2); border-radius: var(--radius-sm); padding: 10px 12px;
-  }
-  .rec-icon {
-    width: 36px; height: 36px; border-radius: 50%;
-    background: var(--info-light); display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  }
-  .rec-icon svg { width: 18px; height: 18px; stroke: var(--info); fill: none; stroke-width: 2; stroke-linecap: round; }
-  .rec-info { flex: 1; min-width: 0; }
-  .rec-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rec-meta { font-size: 11px; color: var(--text3); margin-top: 2px; }
-  .rec-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-  .sm-btn {
-    padding: 6px 10px; font-size: 12px; border-radius: var(--radius-sm);
-    border: 1px solid var(--border2); background: transparent; color: var(--text);
-    cursor: pointer; white-space: nowrap; transition: background 0.12s;
-  }
-  .sm-btn:active { background: var(--surface2); }
-  .sm-btn.claude { border-color: var(--accent); color: var(--accent); font-weight: 500; }
-  .sm-btn.claude:active { background: var(--accent-light); }
-  .sm-btn.dl { border-color: var(--info); color: var(--info); }
-  .sm-btn.del { color: var(--text3); }
-
-  /* 안내 박스 */
-  .guide-box {
-    background: var(--info-light);
-    border: 1px solid rgba(26,111,181,0.2);
-    border-radius: var(--radius-sm);
-    padding: 12px 14px;
-    margin-top: 10px;
-  }
-  .guide-box-title {
-    font-size: 13px; font-weight: 600; color: var(--info); margin-bottom: 8px;
-    display: flex; align-items: center; gap: 6px;
-  }
-  .guide-steps { display: flex; flex-direction: column; gap: 6px; }
-  .guide-step {
-    display: flex; gap: 8px; align-items: flex-start;
-  }
-  .step-num {
-    width: 18px; height: 18px; border-radius: 50%;
-    background: var(--info); color: white;
-    font-size: 10px; font-weight: 700;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; margin-top: 1px;
-  }
-  .step-txt { font-size: 12px; color: var(--text2); line-height: 1.5; }
-  .step-txt strong { color: var(--text); font-weight: 500; }
-  .claude-link {
-    display: inline-flex; align-items: center; gap: 4px;
-    font-size: 12px; font-weight: 500; color: var(--info);
-    text-decoration: none; padding: 6px 12px;
-    border: 1px solid var(--info); border-radius: var(--radius-sm);
-    margin-top: 10px; width: 100%; justify-content: center;
-    background: transparent; cursor: pointer;
-  }
-  .claude-link:active { background: var(--info-light); }
-
-  /* 메모 입력 */
-  .memo-row { margin-top: 10px; }
-  .memo-row label { font-size: 12px; color: var(--text3); display: block; margin-bottom: 4px; }
-  .memo-row textarea {
-    width: 100%; padding: 8px 10px; font-size: 13px;
-    border-radius: var(--radius-sm); border: 1px solid var(--border2);
-    background: var(--surface2); color: var(--text); outline: none;
-    resize: none; min-height: 56px; line-height: 1.5; font-family: inherit;
-  }
-  .memo-row textarea:focus { border-color: var(--accent); }
-
-  /* 상세 패널 */
-  .detail-panel {
-    margin-top: 8px; display: none;
-    background: var(--surface); border: 0.5px solid var(--border);
-    border-radius: var(--radius-sm); padding: 12px 14px;
-  }
-  .detail-panel.open { display: block; }
-  .detail-meta { font-size: 12px; color: var(--text2); margin-bottom: 8px; }
-  .detail-memo { font-size: 13px; color: var(--text); line-height: 1.6; white-space: pre-wrap; }
-  .no-memo { font-size: 12px; color: var(--text3); font-style: italic; }
-
-  .prompt-box {
-    background: var(--surface2); border-radius: var(--radius-sm); padding: 10px 12px; margin-top: 8px;
-  }
-  .prompt-box-label { font-size: 11px; color: var(--text3); margin-bottom: 6px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
-  .prompt-text { font-size: 12px; color: var(--text2); line-height: 1.6; word-break: break-all; }
-  .copy-btn {
-    margin-top: 8px; width: 100%; padding: 8px; font-size: 12px;
-    border-radius: var(--radius-sm); border: 1px solid var(--border2);
-    background: transparent; color: var(--text); cursor: pointer;
-    transition: background 0.12s;
-  }
-  .copy-btn:active { background: var(--surface2); }
-  .copy-done { color: var(--success); }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 회의 분석 앱 - 녹음 테스트</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 50px;
+            background-color: #f5f7f9;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 300px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px 5px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        #recordBtn {
+            background-color: #e74c3c;
+            color: white;
+        }
+        #recordBtn:disabled { background-color: #f1948a; cursor: not-allowed; }
+        
+        #stopBtn {
+            background-color: #34495e;
+            color: white;
+        }
+        #stopBtn:disabled { background-color: #85929e; cursor: not-allowed; }
+        
+        #audioPlayback {
+            margin-top: 20px;
+            width: 100%;
+        }
+        #status {
+            margin-top: 15px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+    </style>
 </head>
 <body>
-<div class="topbar">
-  <h1>회의 녹음기</h1>
-  <p>녹음 후 Claude.ai에서 무료로 AI 분석</p>
-</div>
-<div class="main">
 
-  <!-- 녹음 카드 -->
-  <div class="card">
-    <div class="card-label">녹음</div>
-    <div class="name-row">
-      <label>회의명</label>
-      <input type="text" id="meetingName" placeholder="예: 5월 팀장 회의" />
+    <div class="container">
+        <h2>음성 녹음 테스트</h2>
+        <button id="recordBtn">🔴 녹음 시작</button>
+        <button id="stopBtn" disabled>⬛ 녹음 중지</button>
+        
+        <div id="status">대기 중...</div>
+        
+        <!-- 녹음된 파일을 재생할 오디오 플레이어 -->
+        <audio id="audioPlayback" controls></audio>
     </div>
-    <div class="rec-center">
-      <canvas class="visualizer" id="viz"></canvas>
-      <div class="timer" id="timer">00:00</div>
-      <div class="status-row">
-        <div class="dot" id="dot"></div>
-        <div class="status-txt" id="stxt">녹음 준비됨</div>
-      </div>
-      <button class="rec-btn" id="recBtn" onclick="handleRec()">
-        <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
-          <line x1="12" y1="19" x2="12" y2="23" stroke="white" stroke-width="2" stroke-linecap="round"/>
-          <line x1="8" y1="23" x2="16" y2="23" stroke="white" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-      </button>
-      <div class="btn-row">
-        <button class="ctrl-btn" id="pauseBtn" disabled onclick="handlePause()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
-          일시정지
-        </button>
-        <button class="ctrl-btn" id="stopBtn" disabled onclick="handleStop()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
-          중지 & 저장
-        </button>
-      </div>
-    </div>
-    <!-- 메모 -->
-    <div class="memo-row" id="memoRow" style="display:none;">
-      <label>회의 메모 (선택사항 — 저장 전 입력)</label>
-      <textarea id="memoInput" placeholder="주요 논의 사항, 참석자 등 간단히 메모..."></textarea>
-    </div>
-  </div>
 
-  <!-- 녹음 목록 -->
-  <div class="card">
-    <div class="card-label">저장된 녹음 목록</div>
-    <div class="rec-list" id="recList"><div class="empty">저장된 녹음이 없습니다</div></div>
-  </div>
+    <script>
+        const recordBtn = document.getElementById('recordBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const audioPlayback = document.getElementById('audioPlayback');
+        const statusText = document.getElementById('status');
 
-  <!-- Claude.ai 분석 안내 -->
-  <div class="card">
-    <div class="card-label">AI 분석 방법</div>
-    <div class="guide-box">
-      <div class="guide-box-title">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        Claude.ai Pro 구독으로 무료 분석 가능
-      </div>
-      <div class="guide-steps">
-        <div class="guide-step">
-          <div class="step-num">1</div>
-          <div class="step-txt">녹음 목록에서 <strong>저장</strong> 버튼으로 파일을 다운로드합니다</div>
-        </div>
-        <div class="guide-step">
-          <div class="step-num">2</div>
-          <div class="step-txt"><strong>Claude.ai</strong>에 접속하여 파일을 첨부합니다</div>
-        </div>
-        <div class="guide-step">
-          <div class="step-num">3</div>
-          <div class="step-txt">아래 <strong>프롬프트 복사</strong> 버튼을 누른 후 Claude에 붙여넣기 합니다</div>
-        </div>
-      </div>
-      <div class="prompt-box">
-        <div class="prompt-box-label">분석 프롬프트</div>
-        <div class="prompt-text" id="promptText">이 회의 녹음 파일을 분석해줘. ① 회의 핵심 내용 3~5줄 요약, ② 전반적인 말투와 분위기 분석 (공격적/협력적/소극적 등), ③ 감정 키워드 태그 (긍정/부정/중립/주의 구분), ④ 주요 발언 포인트 정리. 한국어로 답해줘.</div>
-      </div>
-      <button class="copy-btn" id="copyPromptBtn" onclick="copyPrompt()">프롬프트 복사</button>
-      <a class="claude-link" href="https://claude.ai" target="_blank">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-        Claude.ai 열기
-      </a>
-    </div>
-  </div>
+        let mediaRecorder;
+        let audioChunks = [];
 
-</div>
+        // 마이크 권한 요청 및 초기화 함수
+        async function setupAudio() {
+            try {
+                // 브라우저에 마이크 사용 권한 요청
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                // MediaRecorder 객체 생성
+                mediaRecorder = new MediaRecorder(stream);
 
-<script>
-let mediaRecorder = null;
-let audioChunks = [];
-let timerInt = null;
-let startMs = 0;
-let elapsed = 0;
-let audioCtx = null;
-let analyser = null;
-let animId = null;
-let recordings = [];
+                // 녹음 데이터가 생성될 때마다 배열에 저장
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
 
-const timerEl = document.getElementById('timer');
-const dot = document.getElementById('dot');
-const stxt = document.getElementById('stxt');
-const recBtn = document.getElementById('recBtn');
-const pauseBtn = document.getElementById('pauseBtn');
-const stopBtn = document.getElementById('stopBtn');
-const canvas = document.getElementById('viz');
-const ctx2d = canvas.getContext('2d');
-const memoRow = document.getElementById('memoRow');
+                // 녹음이 완전히 종료되었을 때 실행되는 동작
+                mediaRecorder.onstop = () => {
+                    // 저장된 오디오 조각들을 하나의 파일(Blob)로 합침
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    
+                    // 화면의 오디오 플레이어에 파일 연결
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    audioPlayback.src = audioUrl;
+                    
+                    // 다음 녹음을 위해 배열 초기화
+                    audioChunks = [];
+                    statusText.innerText = "녹음 완료! 재생해 보세요.";
+                };
 
-function fmt(ms) {
-  const s = Math.floor(ms / 1000);
-  return String(Math.floor(s / 60)).padStart(2,'0') + ':' + String(s % 60).padStart(2,'0');
-}
+            } catch (error) {
+                console.error("마이크 접근 오류:", error);
+                statusText.innerText = "마이크 권한을 허용해주세요.";
+            }
+        }
 
-// canvas
-function resizeCanvas() {
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = canvas.offsetWidth * dpr;
-  canvas.height = canvas.offsetHeight * dpr;
-  ctx2d.scale(dpr, dpr);
-}
-resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
+        // '녹음 시작' 버튼 클릭 이벤트
+        recordBtn.addEventListener('click', () => {
+            if (!mediaRecorder) setupAudio(); // 첫 클릭 시 초기화
+            
+            // setupAudio()는 비동기이므로 약간의 지연 후 실행 처리
+            setTimeout(() => {
+                if (mediaRecorder && mediaRecorder.state === "inactive") {
+                    mediaRecorder.start();
+                    statusText.innerText = "녹음 중입니다...";
+                    statusText.style.color = "#e74c3c";
+                    recordBtn.disabled = true;
+                    stopBtn.disabled = false;
+                }
+            }, 500);
+        });
 
-function drawIdle() {
-  const W = canvas.offsetWidth, H = canvas.offsetHeight;
-  ctx2d.clearRect(0, 0, W, H);
-  for (let i = 0; i < 40; i++) {
-    const h = 3 + Math.random() * 4;
-    ctx2d.fillStyle = 'rgba(155,154,150,0.25)';
-    ctx2d.beginPath();
-    ctx2d.roundRect(i*(W/40), H-h, W/40-1.5, h, 2);
-    ctx2d.fill();
-  }
-}
-drawIdle();
+        // '녹음 중지' 버튼 클릭 이벤트
+        stopBtn.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                mediaRecorder.stop();
+                statusText.style.color = "#2c3e50";
+                recordBtn.disabled = false;
+                stopBtn.disabled = true;
+            }
+        });
 
-function drawLive() {
-  if (!analyser) return;
-  animId = requestAnimationFrame(drawLive);
-  const W = canvas.offsetWidth, H = canvas.offsetHeight;
-  const data = new Uint8Array(analyser.frequencyBinCount);
-  analyser.getByteFrequencyData(data);
-  ctx2d.clearRect(0, 0, W, H);
-  for (let i = 0; i < 40; i++) {
-    const v = data[Math.floor(i * data.length / 40)] / 255;
-    const h = Math.max(3, v * H);
-    ctx2d.fillStyle = `rgba(217,79,61,${0.4 + v * 0.6})`;
-    ctx2d.beginPath();
-    ctx2d.roundRect(i*(W/40), H-h, W/40-1.5, h, 2);
-    ctx2d.fill();
-  }
-}
-
-function getSupportedMime() {
-  const types = ['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4'];
-  for (const t of types) { if (MediaRecorder.isTypeSupported(t)) return t; }
-  return '';
-}
-
-async function handleRec() {
-  if (mediaRecorder && mediaRecorder.state === 'paused') {
-    mediaRecorder.resume();
-    startMs = Date.now() - elapsed;
-    timerInt = setInterval(() => { elapsed = Date.now() - startMs; timerEl.textContent = fmt(elapsed); }, 500);
-    setUI('recording');
-    drawLive();
-    return;
-  }
-  if (mediaRecorder && mediaRecorder.state === 'recording') return;
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 256;
-    audioCtx.createMediaStreamSource(stream).connect(analyser);
-    const mime = getSupportedMime();
-    mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : {});
-    audioChunks = [];
-    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-    mediaRecorder.onstop = () => finishRecording(stream);
-    mediaRecorder.start(100);
-    startMs = Date.now(); elapsed = 0;
-    timerInt = setInterval(() => { elapsed = Date.now() - startMs; timerEl.textContent = fmt(elapsed); }, 500);
-    setUI('recording');
-    drawLive();
-  } catch(e) {
-    stxt.textContent = '마이크 권한이 필요합니다';
-  }
-}
-
-function handlePause() {
-  if (!mediaRecorder) return;
-  if (mediaRecorder.state === 'recording') {
-    mediaRecorder.pause();
-    clearInterval(timerInt);
-    cancelAnimationFrame(animId);
-    drawIdle();
-    setUI('paused');
-  } else if (mediaRecorder.state === 'paused') {
-    handleRec();
-  }
-}
-
-function handleStop() {
-  if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
-  mediaRecorder.stop();
-  clearInterval(timerInt);
-  cancelAnimationFrame(animId);
-  drawIdle();
-  setUI('idle');
-  timerEl.textContent = '00:00';
-  memoRow.style.display = 'none';
-}
-
-function setUI(state) {
-  if (state === 'idle') {
-    dot.className = 'dot'; stxt.textContent = '녹음 준비됨';
-    recBtn.className = 'rec-btn';
-    pauseBtn.disabled = true; stopBtn.disabled = true;
-    pauseBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg> 일시정지';
-  } else if (state === 'recording') {
-    dot.className = 'dot live'; stxt.textContent = '녹음 중';
-    recBtn.className = 'rec-btn recording';
-    pauseBtn.disabled = false; stopBtn.disabled = false;
-    memoRow.style.display = 'block';
-    pauseBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg> 일시정지';
-  } else if (state === 'paused') {
-    dot.className = 'dot'; stxt.textContent = '일시정지됨';
-    recBtn.className = 'rec-btn';
-    pauseBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg> 재개';
-  }
-}
-
-function blobToBase64(blob) {
-  return new Promise(res => {
-    const r = new FileReader();
-    r.onload = () => res(r.result);
-    r.readAsDataURL(blob);
-  });
-}
-
-async function finishRecording(stream) {
-  stream.getTracks().forEach(t => t.stop());
-  const mime = getSupportedMime() || 'audio/webm';
-  const blob = new Blob(audioChunks, { type: mime });
-  const url = URL.createObjectURL(blob);
-  const b64 = await blobToBase64(blob);
-  const name = document.getElementById('meetingName').value.trim() || '회의 녹음';
-  const memo = document.getElementById('memoInput').value.trim();
-  document.getElementById('memoInput').value = '';
-  const rec = { id: Date.now(), name, url, b64, duration: elapsed, date: new Date().toLocaleDateString('ko-KR'), memo };
-  recordings.unshift(rec);
-  saveData();
-  renderList();
-}
-
-// localStorage
-function saveData() {
-  try {
-    const data = recordings.map(r => ({ id: r.id, name: r.name, duration: r.duration, date: r.date, memo: r.memo || '', b64: r.b64 }));
-    localStorage.setItem('meetingRecs_v2', JSON.stringify(data));
-  } catch(e) {}
-}
-
-function loadData() {
-  try {
-    const raw = localStorage.getItem('meetingRecs_v2');
-    if (raw) {
-      recordings = JSON.parse(raw);
-      recordings.forEach(r => { if (r.b64 && !r.url) r.url = r.b64; });
-      renderList();
-    }
-  } catch(e) {}
-}
-
-function renderList() {
-  const el = document.getElementById('recList');
-  if (!recordings.length) { el.innerHTML = '<div class="empty">저장된 녹음이 없습니다</div>'; return; }
-  el.innerHTML = recordings.map((r, i) => `
-    <div>
-      <div class="rec-item">
-        <div class="rec-icon">
-          <svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-        </div>
-        <div class="rec-info">
-          <div class="rec-name">${r.name}</div>
-          <div class="rec-meta">${r.date} · ${fmt(r.duration)}</div>
-        </div>
-        <div class="rec-actions">
-          <button class="sm-btn dl" onclick="downloadRec(${i})">저장</button>
-          <button class="sm-btn claude" onclick="toggleDetail(${i})">상세</button>
-          <button class="sm-btn del" onclick="deleteRec(${i})">삭제</button>
-        </div>
-      </div>
-      <div class="detail-panel" id="detail-${r.id}">
-        <div class="detail-meta">${r.date} · ${fmt(r.duration)}</div>
-        ${r.memo ? `<div class="detail-memo">${r.memo}</div>` : '<div class="no-memo">메모 없음</div>'}
-        <button class="copy-btn" style="margin-top:10px;" onclick="copyPromptForRec('${r.name.replace(/'/g,"\\'")}')">이 회의용 프롬프트 복사</button>
-      </div>
-    </div>
-  `).join('');
-}
-
-function toggleDetail(i) {
-  const panel = document.getElementById('detail-' + recordings[i].id);
-  panel.classList.toggle('open');
-}
-
-function downloadRec(i) {
-  const r = recordings[i];
-  const a = document.createElement('a');
-  a.href = r.url || r.b64;
-  a.download = r.name + '.webm';
-  a.click();
-}
-
-function deleteRec(i) {
-  if (!confirm(`"${recordings[i].name}" 녹음을 삭제할까요?`)) return;
-  recordings.splice(i, 1);
-  saveData();
-  renderList();
-}
-
-function copyPrompt() {
-  const text = document.getElementById('promptText').textContent;
-  navigator.clipboard.writeText(text).then(() => {
-    const btn = document.getElementById('copyPromptBtn');
-    btn.textContent = '복사됨!';
-    btn.classList.add('copy-done');
-    setTimeout(() => { btn.textContent = '프롬프트 복사'; btn.classList.remove('copy-done'); }, 2000);
-  });
-}
-
-function copyPromptForRec(name) {
-  const text = `"${name}" 회의 녹음 파일을 분석해줘. ① 회의 핵심 내용 3~5줄 요약, ② 전반적인 말투와 분위기 분석 (공격적/협력적/소극적 등), ③ 감정 키워드 태그 (긍정/부정/중립/주의 구분), ④ 주요 발언 포인트 정리. 한국어로 답해줘.`;
-  navigator.clipboard.writeText(text).then(() => alert('프롬프트가 복사됐습니다. Claude.ai에 파일과 함께 붙여넣기 하세요.'));
-}
-
-loadData();
-</script>
+        // 페이지 로드 시 바로 마이크 세팅 시도
+        setupAudio();
+    </script>
 </body>
 </html>
