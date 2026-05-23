@@ -5,15 +5,53 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI 회의 분석 앱 - 녹음 테스트</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; margin-top: 50px; background-color: #f5f7f9; }
-        .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; width: 300px; }
-        button { padding: 10px 20px; margin: 10px 5px; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; transition: background-color 0.2s; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            margin-top: 50px; 
+            background-color: #f5f7f9; 
+        }
+        .container { 
+            background: white; 
+            padding: 30px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+            text-align: center; 
+            width: 300px; 
+        }
+        button { 
+            padding: 10px 20px; 
+            margin: 10px 5px; 
+            border: none; 
+            border-radius: 6px; 
+            font-size: 16px; 
+            cursor: pointer; 
+            transition: background-color 0.2s; 
+        }
         #recordBtn { background-color: #e74c3c; color: white; }
         #recordBtn:disabled { background-color: #f1948a; cursor: not-allowed; }
+        
         #stopBtn { background-color: #34495e; color: white; }
         #stopBtn:disabled { background-color: #85929e; cursor: not-allowed; }
+        
         #audioPlayback { margin-top: 20px; width: 100%; }
-        #status { margin-top: 15px; font-weight: bold; color: #2c3e50; font-size: 14px; word-break: keep-all; }
+        
+        #status { 
+            margin-top: 15px; 
+            font-weight: bold; 
+            color: #2c3e50; 
+            font-size: 14px; 
+            word-break: keep-all; 
+        }
+        
+        /* 버전 표시용 스타일 */
+        .version-tag {
+            margin-top: 25px;
+            font-size: 12px;
+            color: #95a5a6;
+        }
     </style>
 </head>
 <body>
@@ -26,10 +64,12 @@
         <div id="status">대기 중...</div>
         
         <audio id="audioPlayback" controls></audio>
+        
+        <div class="version-tag">v1.1</div>
     </div>
 
     <script>
-const recordBtn = document.getElementById('recordBtn');
+        const recordBtn = document.getElementById('recordBtn');
         const stopBtn = document.getElementById('stopBtn');
         const audioPlayback = document.getElementById('audioPlayback');
         const statusText = document.getElementById('status');
@@ -46,12 +86,14 @@ const recordBtn = document.getElementById('recordBtn');
                 audioChunks = []; 
 
                 mediaRecorder.ondataavailable = event => {
-                    audioChunks.push(event.data);
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
                 };
 
                 mediaRecorder.onstop = () => {
-                    // 💡 핵심 수정 부분: 브라우저 환경에 맞는 파일 형식 자동 지정
-                    const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+                    // 아이폰(Safari)을 포함해 어떤 브라우저든 가장 기본이 되는 포맷으로 자동 설정하도록 보완
+                    const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/mp4' });
                     const audioUrl = URL.createObjectURL(audioBlob);
                     audioPlayback.src = audioUrl;
                     
