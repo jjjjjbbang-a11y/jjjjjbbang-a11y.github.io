@@ -367,12 +367,36 @@
         .spk-5 { align-items: flex-end; }
 
         /* 요약/감정 영역 */
-        #summaryBox {
+        #summaryBox, #emotionBox {
             font-size: 14px;
             color: #333;
             line-height: 1.8;
             white-space: pre-wrap;
             word-break: keep-all;
+        }
+
+        /* 감정 카드 */
+        .emotion-card {
+            background: #F8F9FA;
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+            border-left: 4px solid #ccc;
+        }
+        .emotion-card.positive { border-left-color: #34A853; }
+        .emotion-card.negative { border-left-color: #E53935; }
+        .emotion-card.neutral  { border-left-color: #9E9E9E; }
+        .emotion-card.mixed    { border-left-color: #FB8C00; }
+        .emotion-label {
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: #555;
+        }
+        .emotion-text {
+            font-size: 13px;
+            color: #333;
+            line-height: 1.6;
         }
 
         /* 복사 버튼 */
@@ -447,16 +471,19 @@
                 대화록<br><span style="font-weight:400; font-size:11px;">화자 분리</span>
             </div>
             <div class="mode-tab" data-mode="summary" onclick="setMode('summary')">
-                요약+감정<br><span style="font-weight:400; font-size:11px;">핵심 정리</span>
+                요약<br><span style="font-weight:400; font-size:11px;">핵심 정리</span>
+            </div>
+            <div class="mode-tab" data-mode="emotion" onclick="setMode('emotion')">
+                감정<br><span style="font-weight:400; font-size:11px;">분위기 분석</span>
             </div>
             <div class="mode-tab" data-mode="full" onclick="setMode('full')">
-                전체 분석<br><span style="font-weight:400; font-size:11px;">모두 포함</span>
+                전체<br><span style="font-weight:400; font-size:11px;">모두 포함</span>
             </div>
         </div>
         <button id="analyzeBtn" onclick="runAnalyze()" disabled>분석 실행</button>
         <div class="tip">
             회의실 다자간 녹음에 최적화되어 있습니다.<br>
-            화자 수를 미리 설정하면 더 정확하게 구분됩니다.
+            <b>전체</b> 모드를 선택하면 대화록·요약·감정을 한 번에 분석합니다.
         </div>
     </div>
 
@@ -469,7 +496,8 @@
 
         <div class="result-tabs">
             <div class="result-tab active" onclick="showResultTab('dialogue')">대화록</div>
-            <div class="result-tab" onclick="showResultTab('summary')">요약 &amp; 감정</div>
+            <div class="result-tab" onclick="showResultTab('summary')">요약</div>
+            <div class="result-tab" onclick="showResultTab('emotion')">감정 분석</div>
         </div>
 
         <div class="result-panel active" id="panel-dialogue">
@@ -478,6 +506,10 @@
 
         <div class="result-panel" id="panel-summary">
             <div id="summaryBox"></div>
+        </div>
+
+        <div class="result-panel" id="panel-emotion">
+            <div id="emotionBox"></div>
         </div>
 
         <button class="copy-btn" onclick="copyResult()">결과 텍스트 복사</button>
@@ -525,11 +557,12 @@
     }
 
     function showResultTab(tab) {
-        document.querySelectorAll('.result-tab').forEach((t, i) => {
-            t.classList.toggle('active', (i === 0 && tab === 'dialogue') || (i === 1 && tab === 'summary'));
+        const tabs = document.querySelectorAll('.result-tab');
+        const tabIds = ['dialogue', 'summary', 'emotion'];
+        tabs.forEach((t, i) => t.classList.toggle('active', tabIds[i] === tab));
+        tabIds.forEach(id => {
+            document.getElementById(`panel-${id}`).classList.toggle('active', id === tab);
         });
-        document.getElementById('panel-dialogue').classList.toggle('active', tab === 'dialogue');
-        document.getElementById('panel-summary').classList.toggle('active', tab === 'summary');
     }
 
     function startTimer() {
@@ -678,24 +711,71 @@
 - 대화록만 출력하고 다른 설명은 쓰지 마`;
 
         const summaryPrompt = `
-이 음성을 한국어로 분석해줘.
+이 음성 대화 내용을 한국어로 요약해줘.
 
-【요약】
-회의/대화의 핵심 내용을 3~5줄로 요약.
+아래 규칙을 반드시 지켜:
+- 화자1, 화자2 같은 화자 표시 없이, 어떤 주제와 내용이 오갔는지만 서술해
+- 누가 말했는지가 아니라, 무슨 내용이 논의됐는지 중심으로 작성
+- 전체 대화의 흐름을 3~5줄로 자연스럽게 요약
+- 주요 키워드나 핵심 주제가 있으면 마지막에 따로 정리
 
-【주요 키워드】
-핵심 단어 또는 주제 5개 이내.
+[요약]
+(여기에 요약 내용)
 
-【감정 분석】
-전반적인 분위기와 각 발화자의 감정 상태 분석.
+[주요 키워드]
+(핵심 단어 5개 이내, 쉼표로 구분)
 
-【결론 / 액션아이템】
-논의된 결론이나 다음 행동 항목이 있으면 정리.`;
+[결론 및 액션아이템]
+(논의된 결론이나 다음 행동 항목, 없으면 "없음")`;
 
-        const fullPrompt = dialoguePrompt + '\n\n---\n\n' + summaryPrompt.replace('이 음성을', '\n그리고 이 음성을');
+        const emotionPrompt = `
+이 음성 대화에서 전체적인 분위기와 감정을 한국어로 분석해줘.
+
+아래 형식으로 출력해:
+
+[전체 분위기]
+(대화 전반의 분위기를 1~2줄로 설명. 예: 긴장감 있는 토론, 우호적인 회의 등)
+
+[화자별 감정]
+화자1: (감정 상태 설명)
+화자2: (감정 상태 설명)
+(화자 수만큼 반복)
+
+[감정 변화 흐름]
+(대화가 진행되면서 분위기나 감정이 어떻게 변했는지 설명)`;
+
+        const fullPrompt = `
+이 음성은 회의실에서 ${spkCnt}명이 나눈 대화입니다.
+아래 세 가지를 순서대로 한국어로 작성해줘.
+
+===DIALOGUE===
+각 발화자를 목소리, 말투, 내용 흐름으로 구분하여 아래 형식으로만 작성:
+화자1: (발화 내용)
+화자2: (발화 내용)
+- 화자 번호는 처음 말한 순서대로 1번부터 부여
+- 불분명하거나 겹치는 구간은 [불명확] 으로 표시
+
+===SUMMARY===
+화자 표시 없이 어떤 내용이 논의됐는지 3~5줄로 요약.
+[요약]
+(내용)
+[주요 키워드]
+(쉼표 구분, 5개 이내)
+[결론 및 액션아이템]
+(없으면 "없음")
+
+===EMOTION===
+[전체 분위기]
+(1~2줄)
+[화자별 감정]
+화자1: (감정)
+화자2: (감정)
+[감정 변화 흐름]
+(설명)`;
 
         const prompt = currentMode === 'dialogue' ? dialoguePrompt
                      : currentMode === 'summary'  ? summaryPrompt
+                     : currentMode === 'emotion'  ? emotionPrompt
                      : fullPrompt;
 
         try {
@@ -733,30 +813,45 @@
 
             rawResultText = data.candidates?.[0]?.content?.parts?.[0]?.text || '결과를 가져올 수 없습니다.';
 
-            // 대화록 탭 렌더링
-            if (currentMode === 'dialogue' || currentMode === 'full') {
-                renderDialogue(rawResultText);
-            } else {
-                document.getElementById('dialogueBox').innerHTML =
-                    '<p style="color:#999;font-size:13px;">대화록 모드가 아닙니다.</p>';
+            // 전체 분석 모드: 섹션 파싱
+            let dialogueText = '', summaryText = '', emotionText = '';
+
+            if (currentMode === 'full') {
+                const dMatch = rawResultText.match(/===DIALOGUE===([\s\S]*?)(?====SUMMARY===|$)/);
+                const sMatch = rawResultText.match(/===SUMMARY===([\s\S]*?)(?====EMOTION===|$)/);
+                const eMatch = rawResultText.match(/===EMOTION===([\s\S]*?)$/);
+                dialogueText = dMatch ? dMatch[1].trim() : rawResultText;
+                summaryText  = sMatch ? sMatch[1].trim() : '';
+                emotionText  = eMatch ? eMatch[1].trim() : '';
+            } else if (currentMode === 'dialogue') {
+                dialogueText = rawResultText;
+            } else if (currentMode === 'summary') {
+                summaryText = rawResultText;
+            } else if (currentMode === 'emotion') {
+                emotionText = rawResultText;
             }
 
-            // 요약/감정 탭
-            if (currentMode === 'summary') {
-                document.getElementById('summaryBox').textContent = rawResultText;
-            } else if (currentMode === 'full') {
-                // full 모드: 구분선 이후를 요약 탭에
-                const parts = rawResultText.split('---');
-                document.getElementById('summaryBox').textContent = parts[1]?.trim() || rawResultText;
+            // 대화록 탭
+            if (dialogueText) {
+                renderDialogue(dialogueText);
             } else {
-                document.getElementById('summaryBox').textContent = '요약+감정 모드를 선택해 다시 분석해 주세요.';
+                document.getElementById('dialogueBox').innerHTML =
+                    '<p style="color:#999;font-size:13px;padding:8px 0;">전체 분석 모드를 선택하면 대화록도 함께 표시됩니다.</p>';
             }
+
+            // 요약 탭
+            renderSummary(summaryText);
+
+            // 감정 탭
+            renderEmotion(emotionText);
 
             document.getElementById('modelBadge').textContent = model;
             document.getElementById('resultCard').style.display = 'block';
 
-            // 대화록 모드면 대화 탭 기본, 아니면 요약 탭
-            showResultTab(currentMode === 'summary' ? 'summary' : 'dialogue');
+            // 기본 탭 결정
+            if (currentMode === 'dialogue' || currentMode === 'full') showResultTab('dialogue');
+            else if (currentMode === 'summary') showResultTab('summary');
+            else showResultTab('emotion');
 
             document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
             setStatus('분석이 완료되었습니다.', 'success');
@@ -767,6 +862,53 @@
             analyzeBtn.disabled = false;
             analyzeBtn.classList.remove('loading');
             analyzeBtn.textContent = '분석 실행';
+        }
+    }
+
+    // 요약 렌더링
+    function renderSummary(text) {
+        const box = document.getElementById('summaryBox');
+        if (!text) {
+            box.innerHTML = '<p style="color:#999;font-size:13px;padding:8px 0;">전체 분석 모드를 선택하면 요약도 함께 표시됩니다.</p>';
+            return;
+        }
+        box.textContent = text;
+    }
+
+    // 감정 분석 렌더링
+    function renderEmotion(text) {
+        const box = document.getElementById('emotionBox');
+        if (!text) {
+            box.innerHTML = '<p style="color:#999;font-size:13px;padding:8px 0;">전체 분석 모드를 선택하면 감정 분석도 함께 표시됩니다.</p>';
+            return;
+        }
+
+        // 섹션별 파싱해서 카드로 표현
+        box.innerHTML = '';
+        const sections = [
+            { key: '[전체 분위기]', label: '전체 분위기', cls: 'neutral' },
+            { key: '[화자별 감정]', label: '화자별 감정', cls: 'mixed' },
+            { key: '[감정 변화 흐름]', label: '감정 변화 흐름', cls: 'neutral' },
+        ];
+
+        let remaining = text;
+        sections.forEach((sec, i) => {
+            const nextKey = sections[i + 1]?.key || null;
+            const start = remaining.indexOf(sec.key);
+            if (start === -1) return;
+            const contentStart = start + sec.key.length;
+            const end = nextKey ? remaining.indexOf(nextKey, contentStart) : remaining.length;
+            const content = remaining.slice(contentStart, end !== -1 ? end : undefined).trim();
+
+            const card = document.createElement('div');
+            card.className = `emotion-card ${sec.cls}`;
+            card.innerHTML = `<div class="emotion-label">${sec.label}</div><div class="emotion-text">${content.replace(/\n/g, '<br>')}</div>`;
+            box.appendChild(card);
+        });
+
+        // 파싱 실패 시 그냥 텍스트로
+        if (box.children.length === 0) {
+            box.textContent = text;
         }
     }
 
