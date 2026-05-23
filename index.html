@@ -2,249 +2,469 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>AI 비서 v1.0</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>방준배 과장 AI 비서</title>
     <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            font-family: 'Malgun Gothic', sans-serif;
-            max-width: 700px;
-            margin: 40px auto;
-            padding: 20px;
-            background: #f5f5f5;
+            font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+            background: #F0F2F5;
+            min-height: 100vh;
+            padding: 0;
         }
-        h2 {
-            color: #333;
-            border-bottom: 2px solid #4A90D9;
-            padding-bottom: 10px;
+
+        /* 상단 헤더 */
+        .header {
+            background: #1A73E8;
+            color: white;
+            padding: 18px 20px 16px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+        }
+        .header p {
+            font-size: 12px;
+            opacity: 0.85;
+            margin-top: 2px;
+        }
+
+        /* 본문 */
+        .content {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* 카드 */
         .card {
             background: white;
-            border-radius: 10px;
-            padding: 24px;
-            margin-bottom: 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border-radius: 14px;
+            padding: 18px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
         }
-        label {
-            display: block;
-            font-size: 13px;
-            color: #666;
-            margin-bottom: 6px;
+        .card-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #1A73E8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
         }
-        input[type="password"] {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 14px;
-            box-sizing: border-box;
-        }
-        .btn-row {
+
+        /* API 키 입력 */
+        .api-input-wrap {
             display: flex;
-            gap: 10px;
-            margin-top: 16px;
+            align-items: center;
+            border: 1.5px solid #E0E0E0;
+            border-radius: 10px;
+            overflow: hidden;
+            transition: border-color 0.2s;
         }
-        button {
+        .api-input-wrap:focus-within {
+            border-color: #1A73E8;
+        }
+        .api-input-wrap input {
             flex: 1;
-            padding: 12px;
             border: none;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: bold;
+            outline: none;
+            padding: 12px 14px;
+            font-size: 15px;
+            background: transparent;
+            color: #333;
+        }
+        .api-toggle {
+            background: none;
+            border: none;
+            padding: 12px 14px;
             cursor: pointer;
-            transition: background 0.2s;
+            color: #888;
+            font-size: 13px;
+        }
+
+        /* 녹음 영역 */
+        .record-center {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            padding: 8px 0;
+        }
+
+        /* 녹음 버튼 (원형) */
+        .record-btn-wrap {
+            position: relative;
         }
         #recordBtn {
-            background: #4A90D9;
+            width: 84px;
+            height: 84px;
+            border-radius: 50%;
+            border: none;
+            background: #1A73E8;
             color: white;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            transition: background 0.2s, transform 0.1s;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 4px 12px rgba(26, 115, 232, 0.4);
         }
+        #recordBtn:active { transform: scale(0.95); }
         #recordBtn.recording {
             background: #E53935;
+            box-shadow: 0 4px 12px rgba(229, 57, 53, 0.4);
+            animation: pulse 1.5s infinite;
         }
-        #analyzeBtn {
-            background: #43A047;
-            color: white;
+        #recordBtn .mic-icon { font-size: 26px; line-height: 1; }
+        #recordBtn .btn-label { font-size: 11px; }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.5); }
+            70% { box-shadow: 0 0 0 14px rgba(229, 57, 53, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(229, 57, 53, 0); }
         }
-        #analyzeBtn:disabled {
-            background: #aaa;
-            cursor: not-allowed;
-        }
+
+        /* 상태 메시지 */
         #statusBox {
             font-size: 13px;
             color: #666;
-            margin-top: 12px;
-            min-height: 20px;
+            text-align: center;
+            min-height: 18px;
+            line-height: 1.5;
+        }
+        #statusBox.error { color: #E53935; }
+        #statusBox.success { color: #2E7D32; }
+
+        /* 분석 버튼 */
+        #analyzeBtn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            background: #34A853;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            -webkit-tap-highlight-color: transparent;
+            letter-spacing: -0.2px;
+        }
+        #analyzeBtn:active:not(:disabled) { transform: scale(0.98); }
+        #analyzeBtn:disabled {
+            background: #BDBDBD;
+            cursor: not-allowed;
+        }
+        #analyzeBtn.loading {
+            background: #1565C0;
+        }
+
+        /* 결과 카드 */
+        #resultCard { display: none; }
+        .result-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        .result-badge {
+            font-size: 11px;
+            background: #E8F0FE;
+            color: #1A73E8;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-weight: 600;
         }
         #resultBox {
-            display: none;
-            background: #f9f9f9;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 16px;
             font-size: 14px;
-            line-height: 1.7;
-            white-space: pre-wrap;
             color: #333;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            word-break: keep-all;
         }
-        .result-label {
+
+        /* 모델 선택 */
+        .model-select-wrap {
+            margin-top: 10px;
+        }
+        .model-select-wrap label {
             font-size: 12px;
-            font-weight: bold;
-            color: #4A90D9;
-            margin-bottom: 8px;
+            color: #888;
+            display: block;
+            margin-bottom: 6px;
+        }
+        select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1.5px solid #E0E0E0;
+            border-radius: 10px;
+            font-size: 14px;
+            color: #333;
+            background: white;
+            outline: none;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+        }
+        select:focus { border-color: #1A73E8; }
+
+        /* 로딩 스피너 */
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.4);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* 안내 섹션 */
+        .tip {
+            background: #FFF8E1;
+            border-left: 3px solid #FFA000;
+            border-radius: 0 8px 8px 0;
+            padding: 10px 12px;
+            font-size: 12px;
+            color: #5D4037;
+            line-height: 1.6;
         }
     </style>
 </head>
 <body>
-    <h2>방준배 과장 AI 비서</h2>
 
-    <div class="card">
-        <label>Google AI Studio API 키</label>
-        <input type="password" id="apiKey" placeholder="API 키를 입력하세요">
-    </div>
+<div class="header">
+    <h1>방준배 과장 AI 비서</h1>
+    <p>음성 녹음 &rarr; 텍스트 변환 &amp; 분석</p>
+</div>
 
+<div class="content">
+
+    <!-- API 키 카드 -->
     <div class="card">
-        <div class="btn-row">
-            <button id="recordBtn">녹음 시작</button>
-            <button id="analyzeBtn" disabled>분석 실행</button>
+        <div class="card-title">Google AI Studio API 키</div>
+        <div class="api-input-wrap">
+            <input type="password" id="apiKey" placeholder="API 키를 입력하세요">
+            <button class="api-toggle" id="toggleKey" onclick="toggleApiKey()">표시</button>
         </div>
-        <div id="statusBox">준비 완료. 녹음 버튼을 눌러 시작하세요.</div>
+        <div class="model-select-wrap">
+            <label>사용 모델 선택</label>
+            <select id="modelSelect">
+                <option value="gemini-2.5-flash">gemini-2.5-flash (권장)</option>
+                <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+            </select>
+        </div>
     </div>
 
-    <div class="card" id="resultCard" style="display:none;">
-        <div class="result-label">분석 결과</div>
+    <!-- 녹음 카드 -->
+    <div class="card">
+        <div class="card-title">음성 녹음</div>
+        <div class="record-center">
+            <button id="recordBtn" onclick="toggleRecord()">
+                <span class="mic-icon">&#127897;</span>
+                <span class="btn-label" id="recordLabel">녹음 시작</span>
+            </button>
+            <div id="statusBox">버튼을 눌러 녹음을 시작하세요.</div>
+        </div>
+    </div>
+
+    <!-- 분석 카드 -->
+    <div class="card">
+        <div class="card-title">AI 분석</div>
+        <button id="analyzeBtn" onclick="runAnalyze()" disabled>분석 실행</button>
+        <div class="tip" style="margin-top:12px;">
+            녹음 완료 후 분석을 실행하면 텍스트 변환, 요약, 감정 분석 결과를 제공합니다.
+        </div>
+    </div>
+
+    <!-- 결과 카드 -->
+    <div class="card" id="resultCard">
+        <div class="result-header">
+            <div class="card-title" style="margin-bottom:0;">분석 결과</div>
+            <span class="result-badge" id="modelBadge">gemini-2.5-flash</span>
+        </div>
         <div id="resultBox"></div>
     </div>
 
-    <script>
-        let chunks = [];
-        let recorder = null;
-        let currentBlob = null;
-        let isRecording = false;
+</div>
 
-        const recordBtn = document.getElementById('recordBtn');
-        const analyzeBtn = document.getElementById('analyzeBtn');
-        const statusBox = document.getElementById('statusBox');
-        const resultBox = document.getElementById('resultBox');
-        const resultCard = document.getElementById('resultCard');
+<script>
+    let chunks = [];
+    let recorder = null;
+    let currentBlob = null;
+    let isRecording = false;
 
-        recordBtn.onclick = async () => {
-            if (!isRecording) {
-                // 녹음 시작
-                try {
-                    chunks = []; // 핵심 수정1: 매번 초기화
-                    currentBlob = null;
-                    analyzeBtn.disabled = true;
+    const recordBtn    = document.getElementById('recordBtn');
+    const recordLabel  = document.getElementById('recordLabel');
+    const analyzeBtn   = document.getElementById('analyzeBtn');
+    const statusBox    = document.getElementById('statusBox');
+    const resultBox    = document.getElementById('resultBox');
+    const resultCard   = document.getElementById('resultCard');
+    const modelBadge   = document.getElementById('modelBadge');
 
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    function setStatus(msg, type = '') {
+        statusBox.textContent = msg;
+        statusBox.className = type;
+    }
 
-                    // 핵심 수정2: mimeType 명시적 지정 (브라우저 호환성)
-                    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-                        ? 'audio/webm;codecs=opus'
-                        : 'audio/webm';
+    function toggleApiKey() {
+        const input = document.getElementById('apiKey');
+        const btn   = document.getElementById('toggleKey');
+        if (input.type === 'password') {
+            input.type = 'text';
+            btn.textContent = '숨김';
+        } else {
+            input.type = 'password';
+            btn.textContent = '표시';
+        }
+    }
 
-                    recorder = new MediaRecorder(stream, { mimeType });
-
-                    recorder.ondataavailable = (e) => {
-                        if (e.data && e.data.size > 0) {
-                            chunks.push(e.data);
-                        }
-                    };
-
-                    recorder.onstop = () => {
-                        currentBlob = new Blob(chunks, { type: mimeType });
-                        stream.getTracks().forEach(track => track.stop()); // 마이크 해제
-                        analyzeBtn.disabled = false;
-                        recordBtn.textContent = '녹음 시작';
-                        recordBtn.classList.remove('recording');
-                        statusBox.textContent = `녹음 완료 (${(currentBlob.size / 1024).toFixed(1)} KB). 분석 버튼을 누르세요.`;
-                        isRecording = false;
-                    };
-
-                    recorder.start(100); // 100ms 단위로 데이터 수집
-                    isRecording = true;
-                    recordBtn.textContent = '정지 (녹음 중...)';
-                    recordBtn.classList.add('recording');
-                    statusBox.textContent = '녹음 중입니다...';
-
-                } catch (err) {
-                    statusBox.textContent = '마이크 접근 오류: ' + err.message;
-                    console.error(err);
-                }
-            } else {
-                // 녹음 정지
-                recorder.stop();
-            }
-        };
-
-        analyzeBtn.onclick = async () => {
-            const apiKey = document.getElementById('apiKey').value.trim();
-
-            // 핵심 수정3: 사전 검증
-            if (!apiKey) {
-                alert('API 키를 먼저 입력해주세요.');
-                return;
-            }
-            if (!currentBlob) {
-                alert('녹음 파일이 없습니다. 먼저 녹음해주세요.');
-                return;
-            }
-
-            statusBox.textContent = '분석 중입니다... 잠시 기다려주세요.';
-            analyzeBtn.disabled = true;
-            resultCard.style.display = 'none';
-
+    async function toggleRecord() {
+        if (!isRecording) {
             try {
-                const base64 = await new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.readAsDataURL(currentBlob);
-                    reader.onloadend = () => resolve(reader.result.split(',')[1]);
-                    reader.onerror = reject;
-                });
+                chunks = [];
+                currentBlob = null;
+                analyzeBtn.disabled = true;
 
-                // 핵심 수정4: 모델명 및 mimeType 정확히 지정
-                const mimeType = currentBlob.type || 'audio/webm';
-                const res = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`,
-                    {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{
-                                parts: [
-                                    {
-                                        text: "다음 음성을 한국어로 정확히 텍스트로 변환하고, 요약과 감정 분석을 해줘. 형식: [전체 텍스트]\n[요약]\n[감정 분석]"
-                                    },
-                                    {
-                                        inlineData: {
-                                            mimeType: mimeType,
-                                            data: base64
-                                        }
-                                    }
-                                ]
-                            }]
-                        })
-                    }
-                );
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+                    ? 'audio/webm;codecs=opus'
+                    : MediaRecorder.isTypeSupported('audio/mp4')
+                    ? 'audio/mp4'          // iOS Safari 대응
+                    : 'audio/webm';
 
-                const data = await res.json();
+                recorder = new MediaRecorder(stream, { mimeType });
 
-                // 핵심 수정5: 오류 응답 처리
-                if (data.error) {
-                    statusBox.textContent = '오류: ' + data.error.message;
+                recorder.ondataavailable = (e) => {
+                    if (e.data && e.data.size > 0) chunks.push(e.data);
+                };
+
+                recorder.onstop = () => {
+                    currentBlob = new Blob(chunks, { type: mimeType });
+                    stream.getTracks().forEach(t => t.stop());
                     analyzeBtn.disabled = false;
-                    return;
-                }
+                    recordBtn.classList.remove('recording');
+                    recordLabel.textContent = '다시 녹음';
+                    isRecording = false;
+                    setStatus(`녹음 완료 (${(currentBlob.size / 1024).toFixed(1)} KB). 분석 버튼을 누르세요.`, 'success');
+                };
 
-                const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text || '결과를 가져올 수 없습니다.';
-                resultBox.textContent = resultText;
-                resultCard.style.display = 'block';
-                statusBox.textContent = '분석 완료.';
+                recorder.start(100);
+                isRecording = true;
+                recordBtn.classList.add('recording');
+                recordLabel.textContent = '정지';
+                setStatus('녹음 중입니다...');
 
             } catch (err) {
-                statusBox.textContent = '오류 발생: ' + err.message;
-                console.error(err);
+                setStatus('마이크 오류: ' + err.message, 'error');
+            }
+        } else {
+            recorder.stop();
+        }
+    }
+
+    async function runAnalyze() {
+        const apiKey = document.getElementById('apiKey').value.trim();
+        const model  = document.getElementById('modelSelect').value;
+
+        if (!apiKey) {
+            alert('API 키를 먼저 입력해주세요.');
+            return;
+        }
+        if (!currentBlob) {
+            alert('녹음 파일이 없습니다. 먼저 녹음해주세요.');
+            return;
+        }
+
+        analyzeBtn.disabled = true;
+        analyzeBtn.classList.add('loading');
+        analyzeBtn.innerHTML = '<span class="spinner"></span>분석 중...';
+        resultCard.style.display = 'none';
+        setStatus('AI가 분석 중입니다...');
+
+        try {
+            const base64 = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(currentBlob);
+                reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                reader.onerror   = reject;
+            });
+
+            const mimeType = currentBlob.type || 'audio/webm';
+
+            const res = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                {
+                                    text: [
+                                        "다음 음성 내용을 한국어로 분석해줘.",
+                                        "",
+                                        "【전체 텍스트】",
+                                        "음성을 그대로 텍스트로 변환해서 작성.",
+                                        "",
+                                        "【요약】",
+                                        "핵심 내용을 2~3줄로 요약.",
+                                        "",
+                                        "【감정 분석】",
+                                        "말투와 내용을 바탕으로 감정 상태 분석."
+                                    ].join("\n")
+                                },
+                                {
+                                    inlineData: {
+                                        mimeType: mimeType,
+                                        data: base64
+                                    }
+                                }
+                            ]
+                        }]
+                    })
+                }
+            );
+
+            const data = await res.json();
+
+            if (data.error) {
+                setStatus('오류: ' + data.error.message, 'error');
+                return;
             }
 
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '결과를 가져올 수 없습니다.';
+            resultBox.textContent = text;
+            modelBadge.textContent = model;
+            resultCard.style.display = 'block';
+            resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            setStatus('분석이 완료되었습니다.', 'success');
+
+        } catch (err) {
+            setStatus('통신 오류: ' + err.message, 'error');
+        } finally {
             analyzeBtn.disabled = false;
-        };
-    </script>
+            analyzeBtn.classList.remove('loading');
+            analyzeBtn.textContent = '분석 실행';
+        }
+    }
+</script>
 </body>
 </html>
