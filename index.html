@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>방준배 과장 AI 비서</title>
+    <title>녹음 비서</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -11,10 +11,9 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
             background: #F0F2F5;
             min-height: 100vh;
-            padding: 0;
         }
 
-        /* 상단 헤더 */
+        /* 헤더 */
         .header {
             background: #1A73E8;
             color: white;
@@ -23,18 +22,9 @@
             top: 0;
             z-index: 10;
         }
-        .header h1 {
-            font-size: 18px;
-            font-weight: 600;
-            letter-spacing: -0.3px;
-        }
-        .header p {
-            font-size: 12px;
-            opacity: 0.85;
-            margin-top: 2px;
-        }
+        .header h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+        .header p  { font-size: 12px; opacity: 0.85; margin-top: 2px; }
 
-        /* 본문 */
         .content {
             padding: 16px;
             display: flex;
@@ -58,7 +48,7 @@
             margin-bottom: 10px;
         }
 
-        /* API 키 입력 */
+        /* API 키 */
         .api-input-wrap {
             display: flex;
             align-items: center;
@@ -67,9 +57,7 @@
             overflow: hidden;
             transition: border-color 0.2s;
         }
-        .api-input-wrap:focus-within {
-            border-color: #1A73E8;
-        }
+        .api-input-wrap:focus-within { border-color: #1A73E8; }
         .api-input-wrap input {
             flex: 1;
             border: none;
@@ -88,117 +76,11 @@
             font-size: 13px;
         }
 
-        /* 녹음 영역 */
-        .record-center {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 16px;
-            padding: 8px 0;
-        }
-
-        /* 녹음 버튼 (원형) */
-        .record-btn-wrap {
-            position: relative;
-        }
-        #recordBtn {
-            width: 84px;
-            height: 84px;
-            border-radius: 50%;
-            border: none;
-            background: #1A73E8;
-            color: white;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 4px;
-            transition: background 0.2s, transform 0.1s;
-            -webkit-tap-highlight-color: transparent;
-            box-shadow: 0 4px 12px rgba(26, 115, 232, 0.4);
-        }
-        #recordBtn:active { transform: scale(0.95); }
-        #recordBtn.recording {
-            background: #E53935;
-            box-shadow: 0 4px 12px rgba(229, 57, 53, 0.4);
-            animation: pulse 1.5s infinite;
-        }
-        #recordBtn .mic-icon { font-size: 26px; line-height: 1; }
-        #recordBtn .btn-label { font-size: 11px; }
-
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.5); }
-            70% { box-shadow: 0 0 0 14px rgba(229, 57, 53, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(229, 57, 53, 0); }
-        }
-
-        /* 상태 메시지 */
-        #statusBox {
-            font-size: 13px;
-            color: #666;
-            text-align: center;
-            min-height: 18px;
-            line-height: 1.5;
-        }
-        #statusBox.error { color: #E53935; }
-        #statusBox.success { color: #2E7D32; }
-
-        /* 분석 버튼 */
-        #analyzeBtn {
-            width: 100%;
-            padding: 15px;
-            border: none;
-            border-radius: 12px;
-            background: #34A853;
-            color: white;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s, transform 0.1s;
-            -webkit-tap-highlight-color: transparent;
-            letter-spacing: -0.2px;
-        }
-        #analyzeBtn:active:not(:disabled) { transform: scale(0.98); }
-        #analyzeBtn:disabled {
-            background: #BDBDBD;
-            cursor: not-allowed;
-        }
-        #analyzeBtn.loading {
-            background: #1565C0;
-        }
-
-        /* 결과 카드 */
-        #resultCard { display: none; }
-        .result-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 12px;
-        }
-        .result-badge {
-            font-size: 11px;
-            background: #E8F0FE;
-            color: #1A73E8;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-weight: 600;
-        }
-        #resultBox {
-            font-size: 14px;
-            color: #333;
-            line-height: 1.8;
-            white-space: pre-wrap;
-            word-break: keep-all;
-        }
-
-        /* 모델 선택 */
-        .model-select-wrap {
+        /* 모델/설정 선택 */
+        .setting-row {
             margin-top: 10px;
         }
-        .model-select-wrap label {
+        .setting-row label {
             font-size: 12px;
             color: #888;
             display: block;
@@ -221,11 +103,158 @@
         }
         select:focus { border-color: #1A73E8; }
 
-        /* 로딩 스피너 */
+        /* 화자 수 입력 */
+        .speaker-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .speaker-row label {
+            font-size: 12px;
+            color: #888;
+            white-space: nowrap;
+        }
+        .speaker-count-wrap {
+            display: flex;
+            align-items: center;
+            border: 1.5px solid #E0E0E0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .speaker-count-wrap button {
+            width: 38px;
+            height: 38px;
+            border: none;
+            background: #F5F5F5;
+            color: #333;
+            font-size: 20px;
+            cursor: pointer;
+            flex-shrink: 0;
+            line-height: 1;
+        }
+        .speaker-count-wrap button:active { background: #E0E0E0; }
+        #speakerCount {
+            width: 40px;
+            text-align: center;
+            border: none;
+            outline: none;
+            font-size: 16px;
+            font-weight: 600;
+            color: #1A73E8;
+            background: white;
+            padding: 8px 0;
+        }
+
+        /* 분석 모드 탭 */
+        .mode-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .mode-tab {
+            flex: 1;
+            padding: 10px 6px;
+            border: 1.5px solid #E0E0E0;
+            border-radius: 10px;
+            background: white;
+            font-size: 12px;
+            font-weight: 600;
+            color: #888;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.15s;
+            -webkit-tap-highlight-color: transparent;
+            line-height: 1.4;
+        }
+        .mode-tab.active {
+            border-color: #1A73E8;
+            color: #1A73E8;
+            background: #E8F0FE;
+        }
+
+        /* 녹음 영역 */
+        .record-center {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            padding: 8px 0;
+        }
+        #recordBtn {
+            width: 84px;
+            height: 84px;
+            border-radius: 50%;
+            border: none;
+            background: #1A73E8;
+            color: white;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            transition: background 0.2s, transform 0.1s;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 4px 12px rgba(26,115,232,0.4);
+        }
+        #recordBtn:active { transform: scale(0.95); }
+        #recordBtn.recording {
+            background: #E53935;
+            box-shadow: 0 4px 12px rgba(229,57,53,0.4);
+            animation: pulse 1.5s infinite;
+        }
+        #recordBtn .mic-icon { font-size: 26px; line-height: 1; }
+        #recordBtn .btn-label { font-size: 11px; }
+
+        @keyframes pulse {
+            0%   { box-shadow: 0 0 0 0 rgba(229,57,53,0.5); }
+            70%  { box-shadow: 0 0 0 14px rgba(229,57,53,0); }
+            100% { box-shadow: 0 0 0 0 rgba(229,57,53,0); }
+        }
+
+        /* 녹음 시간 표시 */
+        #recTimer {
+            font-size: 22px;
+            font-weight: 700;
+            color: #E53935;
+            letter-spacing: 2px;
+            display: none;
+        }
+
+        #statusBox {
+            font-size: 13px;
+            color: #666;
+            text-align: center;
+            min-height: 18px;
+            line-height: 1.5;
+        }
+        #statusBox.error   { color: #E53935; }
+        #statusBox.success { color: #2E7D32; }
+
+        /* 분석 버튼 */
+        #analyzeBtn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            background: #34A853;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        #analyzeBtn:active:not(:disabled) { transform: scale(0.98); }
+        #analyzeBtn:disabled { background: #BDBDBD; cursor: not-allowed; }
+        #analyzeBtn.loading { background: #1565C0; }
+
         .spinner {
             display: inline-block;
-            width: 14px;
-            height: 14px;
+            width: 14px; height: 14px;
             border: 2px solid rgba(255,255,255,0.4);
             border-top-color: white;
             border-radius: 50%;
@@ -235,7 +264,6 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* 안내 섹션 */
         .tip {
             background: #FFF8E1;
             border-left: 3px solid #FFA000;
@@ -244,32 +272,157 @@
             font-size: 12px;
             color: #5D4037;
             line-height: 1.6;
+            margin-top: 12px;
         }
+
+        /* 결과 카드 */
+        #resultCard { display: none; }
+        .result-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+        }
+        .result-badge {
+            font-size: 11px;
+            background: #E8F0FE;
+            color: #1A73E8;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+
+        /* 결과 탭 (대화록 / 요약&감정) */
+        .result-tabs {
+            display: flex;
+            border-bottom: 1.5px solid #E0E0E0;
+            margin-bottom: 14px;
+        }
+        .result-tab {
+            flex: 1;
+            padding: 10px 4px;
+            text-align: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: #888;
+            cursor: pointer;
+            border-bottom: 2.5px solid transparent;
+            margin-bottom: -1.5px;
+            transition: color 0.15s, border-color 0.15s;
+        }
+        .result-tab.active {
+            color: #1A73E8;
+            border-bottom-color: #1A73E8;
+        }
+
+        .result-panel { display: none; }
+        .result-panel.active { display: block; }
+
+        /* 대화 버블 */
+        .dialogue-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .dialogue-line {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .speaker-name {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 0 4px;
+        }
+        .bubble {
+            display: inline-block;
+            padding: 10px 14px;
+            border-radius: 16px;
+            font-size: 14px;
+            line-height: 1.6;
+            max-width: 88%;
+            word-break: keep-all;
+        }
+
+        /* 화자별 색상 (최대 6명) */
+        .spk-0 .speaker-name { color: #1A73E8; }
+        .spk-0 .bubble { background: #E8F0FE; color: #0D47A1; border-radius: 4px 16px 16px 16px; }
+
+        .spk-1 .speaker-name { color: #2E7D32; }
+        .spk-1 .bubble { background: #E8F5E9; color: #1B5E20; border-radius: 16px 4px 16px 16px; align-self: flex-end; }
+        .spk-1 { align-items: flex-end; }
+
+        .spk-2 .speaker-name { color: #E65100; }
+        .spk-2 .bubble { background: #FFF3E0; color: #BF360C; border-radius: 4px 16px 16px 16px; }
+
+        .spk-3 .speaker-name { color: #6A1B9A; }
+        .spk-3 .bubble { background: #F3E5F5; color: #4A148C; border-radius: 16px 4px 16px 16px; align-self: flex-end; }
+        .spk-3 { align-items: flex-end; }
+
+        .spk-4 .speaker-name { color: #00695C; }
+        .spk-4 .bubble { background: #E0F2F1; color: #004D40; border-radius: 4px 16px 16px 16px; }
+
+        .spk-5 .speaker-name { color: #C62828; }
+        .spk-5 .bubble { background: #FFEBEE; color: #B71C1C; border-radius: 16px 4px 16px 16px; align-self: flex-end; }
+        .spk-5 { align-items: flex-end; }
+
+        /* 요약/감정 영역 */
+        #summaryBox {
+            font-size: 14px;
+            color: #333;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            word-break: keep-all;
+        }
+
+        /* 복사 버튼 */
+        .copy-btn {
+            margin-top: 14px;
+            width: 100%;
+            padding: 11px;
+            border: 1.5px solid #1A73E8;
+            border-radius: 10px;
+            background: white;
+            color: #1A73E8;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .copy-btn:active { background: #E8F0FE; }
     </style>
 </head>
 <body>
 
 <div class="header">
-    <h1>방준배 과장 AI 비서</h1>
-    <p>음성 녹음 &rarr; 텍스트 변환 &amp; 분석</p>
+    <h1>녹음 비서</h1>
+    <p>음성 녹음 &rarr; 화자 분리 &amp; 대화 분석</p>
 </div>
 
 <div class="content">
 
-    <!-- API 키 카드 -->
+    <!-- 설정 카드 -->
     <div class="card">
-        <div class="card-title">Google AI Studio API 키</div>
+        <div class="card-title">설정</div>
         <div class="api-input-wrap">
-            <input type="password" id="apiKey" placeholder="API 키를 입력하세요">
+            <input type="password" id="apiKey" placeholder="Google AI Studio API 키">
             <button class="api-toggle" id="toggleKey" onclick="toggleApiKey()">표시</button>
         </div>
-        <div class="model-select-wrap">
-            <label>사용 모델 선택</label>
+        <div class="setting-row">
+            <label>사용 모델</label>
             <select id="modelSelect">
                 <option value="gemini-2.5-flash">gemini-2.5-flash (권장)</option>
                 <option value="gemini-2.0-flash">gemini-2.0-flash</option>
                 <option value="gemini-1.5-flash">gemini-1.5-flash</option>
             </select>
+        </div>
+        <div class="speaker-row">
+            <label>회의 참여 인원</label>
+            <div class="speaker-count-wrap">
+                <button onclick="changeSpeaker(-1)">-</button>
+                <input type="number" id="speakerCount" value="2" min="2" max="6" readonly>
+                <button onclick="changeSpeaker(1)">+</button>
+            </div>
+            <span style="font-size:12px; color:#888;">명 (최대 6)</span>
         </div>
     </div>
 
@@ -281,16 +434,29 @@
                 <span class="mic-icon">&#127897;</span>
                 <span class="btn-label" id="recordLabel">녹음 시작</span>
             </button>
+            <div id="recTimer">00:00</div>
             <div id="statusBox">버튼을 눌러 녹음을 시작하세요.</div>
         </div>
     </div>
 
     <!-- 분석 카드 -->
     <div class="card">
-        <div class="card-title">AI 분석</div>
+        <div class="card-title">분석 모드 선택</div>
+        <div class="mode-tabs">
+            <div class="mode-tab active" data-mode="dialogue" onclick="setMode('dialogue')">
+                대화록<br><span style="font-weight:400; font-size:11px;">화자 분리</span>
+            </div>
+            <div class="mode-tab" data-mode="summary" onclick="setMode('summary')">
+                요약+감정<br><span style="font-weight:400; font-size:11px;">핵심 정리</span>
+            </div>
+            <div class="mode-tab" data-mode="full" onclick="setMode('full')">
+                전체 분석<br><span style="font-weight:400; font-size:11px;">모두 포함</span>
+            </div>
+        </div>
         <button id="analyzeBtn" onclick="runAnalyze()" disabled>분석 실행</button>
-        <div class="tip" style="margin-top:12px;">
-            녹음 완료 후 분석을 실행하면 텍스트 변환, 요약, 감정 분석 결과를 제공합니다.
+        <div class="tip">
+            회의실 다자간 녹음에 최적화되어 있습니다.<br>
+            화자 수를 미리 설정하면 더 정확하게 구분됩니다.
         </div>
     </div>
 
@@ -300,7 +466,21 @@
             <div class="card-title" style="margin-bottom:0;">분석 결과</div>
             <span class="result-badge" id="modelBadge">gemini-2.5-flash</span>
         </div>
-        <div id="resultBox"></div>
+
+        <div class="result-tabs">
+            <div class="result-tab active" onclick="showResultTab('dialogue')">대화록</div>
+            <div class="result-tab" onclick="showResultTab('summary')">요약 &amp; 감정</div>
+        </div>
+
+        <div class="result-panel active" id="panel-dialogue">
+            <div class="dialogue-wrap" id="dialogueBox"></div>
+        </div>
+
+        <div class="result-panel" id="panel-summary">
+            <div id="summaryBox"></div>
+        </div>
+
+        <button class="copy-btn" onclick="copyResult()">결과 텍스트 복사</button>
     </div>
 
 </div>
@@ -310,30 +490,63 @@
     let recorder = null;
     let currentBlob = null;
     let isRecording = false;
+    let timerInterval = null;
+    let recSeconds = 0;
+    let currentMode = 'dialogue';
+    let rawResultText = '';
 
-    const recordBtn    = document.getElementById('recordBtn');
-    const recordLabel  = document.getElementById('recordLabel');
-    const analyzeBtn   = document.getElementById('analyzeBtn');
-    const statusBox    = document.getElementById('statusBox');
-    const resultBox    = document.getElementById('resultBox');
-    const resultCard   = document.getElementById('resultCard');
-    const modelBadge   = document.getElementById('modelBadge');
+    // 화자 색상 라벨
+    const SPEAKER_COLORS = ['#1A73E8','#2E7D32','#E65100','#6A1B9A','#00695C','#C62828'];
 
     function setStatus(msg, type = '') {
-        statusBox.textContent = msg;
-        statusBox.className = type;
+        const box = document.getElementById('statusBox');
+        box.textContent = msg;
+        box.className = type;
     }
 
     function toggleApiKey() {
         const input = document.getElementById('apiKey');
         const btn   = document.getElementById('toggleKey');
-        if (input.type === 'password') {
-            input.type = 'text';
-            btn.textContent = '숨김';
-        } else {
-            input.type = 'password';
-            btn.textContent = '표시';
-        }
+        input.type  = input.type === 'password' ? 'text' : 'password';
+        btn.textContent = input.type === 'password' ? '표시' : '숨김';
+    }
+
+    function changeSpeaker(delta) {
+        const el = document.getElementById('speakerCount');
+        const v  = Math.min(6, Math.max(2, parseInt(el.value) + delta));
+        el.value = v;
+    }
+
+    function setMode(mode) {
+        currentMode = mode;
+        document.querySelectorAll('.mode-tab').forEach(t => {
+            t.classList.toggle('active', t.dataset.mode === mode);
+        });
+    }
+
+    function showResultTab(tab) {
+        document.querySelectorAll('.result-tab').forEach((t, i) => {
+            t.classList.toggle('active', (i === 0 && tab === 'dialogue') || (i === 1 && tab === 'summary'));
+        });
+        document.getElementById('panel-dialogue').classList.toggle('active', tab === 'dialogue');
+        document.getElementById('panel-summary').classList.toggle('active', tab === 'summary');
+    }
+
+    function startTimer() {
+        recSeconds = 0;
+        const el = document.getElementById('recTimer');
+        el.style.display = 'block';
+        timerInterval = setInterval(() => {
+            recSeconds++;
+            const m = String(Math.floor(recSeconds / 60)).padStart(2, '0');
+            const s = String(recSeconds % 60).padStart(2, '0');
+            el.textContent = `${m}:${s}`;
+        }, 1000);
+    }
+
+    function stopTimer() {
+        clearInterval(timerInterval);
+        document.getElementById('recTimer').style.display = 'none';
     }
 
     async function toggleRecord() {
@@ -341,13 +554,13 @@
             try {
                 chunks = [];
                 currentBlob = null;
-                analyzeBtn.disabled = true;
+                document.getElementById('analyzeBtn').disabled = true;
 
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
                     ? 'audio/webm;codecs=opus'
                     : MediaRecorder.isTypeSupported('audio/mp4')
-                    ? 'audio/mp4'          // iOS Safari 대응
+                    ? 'audio/mp4'
                     : 'audio/webm';
 
                 recorder = new MediaRecorder(stream, { mimeType });
@@ -359,17 +572,20 @@
                 recorder.onstop = () => {
                     currentBlob = new Blob(chunks, { type: mimeType });
                     stream.getTracks().forEach(t => t.stop());
-                    analyzeBtn.disabled = false;
-                    recordBtn.classList.remove('recording');
-                    recordLabel.textContent = '다시 녹음';
+                    stopTimer();
+                    document.getElementById('analyzeBtn').disabled = false;
+                    const btn = document.getElementById('recordBtn');
+                    btn.classList.remove('recording');
+                    document.getElementById('recordLabel').textContent = '다시 녹음';
                     isRecording = false;
-                    setStatus(`녹음 완료 (${(currentBlob.size / 1024).toFixed(1)} KB). 분석 버튼을 누르세요.`, 'success');
+                    setStatus(`녹음 완료 (${(currentBlob.size / 1024).toFixed(1)} KB) — 분석 버튼을 누르세요.`, 'success');
                 };
 
                 recorder.start(100);
                 isRecording = true;
-                recordBtn.classList.add('recording');
-                recordLabel.textContent = '정지';
+                startTimer();
+                document.getElementById('recordBtn').classList.add('recording');
+                document.getElementById('recordLabel').textContent = '정지';
                 setStatus('녹음 중입니다...');
 
             } catch (err) {
@@ -380,31 +596,114 @@
         }
     }
 
-    async function runAnalyze() {
-        const apiKey = document.getElementById('apiKey').value.trim();
-        const model  = document.getElementById('modelSelect').value;
+    // 대화록 파싱 & 버블 렌더링
+    function renderDialogue(text) {
+        const wrap = document.getElementById('dialogueBox');
+        wrap.innerHTML = '';
 
-        if (!apiKey) {
-            alert('API 키를 먼저 입력해주세요.');
-            return;
+        // "화자1: 내용" 또는 "[화자1] 내용" 패턴 파싱
+        const lines = text.split('\n').filter(l => l.trim());
+        const speakerMap = {};
+        let spkIdx = 0;
+
+        lines.forEach(line => {
+            // 패턴: "화자N: " 또는 "[화자N] "
+            const match = line.match(/^[\[【]?(화자\s*\d+|Speaker\s*\d+|참여자\s*\d+)[\]】]?\s*[:：]\s*(.+)/i);
+            if (!match) {
+                // 화자 구분 없는 일반 줄 → 그대로 텍스트로
+                const p = document.createElement('p');
+                p.style.cssText = 'font-size:13px;color:#999;margin:4px 0;padding:0 4px;';
+                p.textContent = line;
+                wrap.appendChild(p);
+                return;
+            }
+
+            const rawName = match[1].replace(/\s/g, '');
+            const content = match[2].trim();
+
+            if (!(rawName in speakerMap)) {
+                speakerMap[rawName] = spkIdx++;
+            }
+            const idx = speakerMap[rawName] % 6;
+
+            const div = document.createElement('div');
+            div.className = `dialogue-line spk-${idx}`;
+
+            const nameEl = document.createElement('div');
+            nameEl.className = 'speaker-name';
+            nameEl.textContent = rawName;
+
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.textContent = content;
+
+            div.appendChild(nameEl);
+            div.appendChild(bubble);
+            wrap.appendChild(div);
+        });
+
+        if (wrap.children.length === 0) {
+            wrap.innerHTML = '<p style="color:#999;font-size:13px;">대화 형식을 감지하지 못했습니다. 요약&감정 탭을 확인해 주세요.</p>';
         }
-        if (!currentBlob) {
-            alert('녹음 파일이 없습니다. 먼저 녹음해주세요.');
-            return;
-        }
+    }
+
+    async function runAnalyze() {
+        const apiKey  = document.getElementById('apiKey').value.trim();
+        const model   = document.getElementById('modelSelect').value;
+        const spkCnt  = document.getElementById('speakerCount').value;
+        const analyzeBtn = document.getElementById('analyzeBtn');
+
+        if (!apiKey) { alert('API 키를 먼저 입력해주세요.'); return; }
+        if (!currentBlob) { alert('녹음 파일이 없습니다. 먼저 녹음해주세요.'); return; }
 
         analyzeBtn.disabled = true;
         analyzeBtn.classList.add('loading');
         analyzeBtn.innerHTML = '<span class="spinner"></span>분석 중...';
-        resultCard.style.display = 'none';
+        document.getElementById('resultCard').style.display = 'none';
         setStatus('AI가 분석 중입니다...');
+
+        // 모드별 프롬프트 구성
+        const dialoguePrompt = `
+이 음성은 회의실에서 ${spkCnt}명이 나눈 대화입니다.
+각 발화자를 목소리, 말투, 내용 흐름으로 구분하여 아래 형식으로 대화록을 작성해줘.
+반드시 한국어로 작성하고, 각 줄은 반드시 아래 형식을 지켜줘:
+
+화자1: (발화 내용)
+화자2: (발화 내용)
+화자3: (발화 내용)
+
+- 화자 번호는 처음 말한 순서대로 1번부터 부여
+- 한 사람이 연속으로 말하면 같은 화자 번호 유지
+- 불분명하거나 겹치는 구간은 [불명확] 으로 표시
+- 대화록만 출력하고 다른 설명은 쓰지 마`;
+
+        const summaryPrompt = `
+이 음성을 한국어로 분석해줘.
+
+【요약】
+회의/대화의 핵심 내용을 3~5줄로 요약.
+
+【주요 키워드】
+핵심 단어 또는 주제 5개 이내.
+
+【감정 분석】
+전반적인 분위기와 각 발화자의 감정 상태 분석.
+
+【결론 / 액션아이템】
+논의된 결론이나 다음 행동 항목이 있으면 정리.`;
+
+        const fullPrompt = dialoguePrompt + '\n\n---\n\n' + summaryPrompt.replace('이 음성을', '\n그리고 이 음성을');
+
+        const prompt = currentMode === 'dialogue' ? dialoguePrompt
+                     : currentMode === 'summary'  ? summaryPrompt
+                     : fullPrompt;
 
         try {
             const base64 = await new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.readAsDataURL(currentBlob);
                 reader.onloadend = () => resolve(reader.result.split(',')[1]);
-                reader.onerror   = reject;
+                reader.onerror = reject;
             });
 
             const mimeType = currentBlob.type || 'audio/webm';
@@ -417,26 +716,8 @@
                     body: JSON.stringify({
                         contents: [{
                             parts: [
-                                {
-                                    text: [
-                                        "다음 음성 내용을 한국어로 분석해줘.",
-                                        "",
-                                        "【전체 텍스트】",
-                                        "음성을 그대로 텍스트로 변환해서 작성.",
-                                        "",
-                                        "【요약】",
-                                        "핵심 내용을 2~3줄로 요약.",
-                                        "",
-                                        "【감정 분석】",
-                                        "말투와 내용을 바탕으로 감정 상태 분석."
-                                    ].join("\n")
-                                },
-                                {
-                                    inlineData: {
-                                        mimeType: mimeType,
-                                        data: base64
-                                    }
-                                }
+                                { text: prompt },
+                                { inlineData: { mimeType, data: base64 } }
                             ]
                         }]
                     })
@@ -450,11 +731,34 @@
                 return;
             }
 
-            const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '결과를 가져올 수 없습니다.';
-            resultBox.textContent = text;
-            modelBadge.textContent = model;
-            resultCard.style.display = 'block';
-            resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            rawResultText = data.candidates?.[0]?.content?.parts?.[0]?.text || '결과를 가져올 수 없습니다.';
+
+            // 대화록 탭 렌더링
+            if (currentMode === 'dialogue' || currentMode === 'full') {
+                renderDialogue(rawResultText);
+            } else {
+                document.getElementById('dialogueBox').innerHTML =
+                    '<p style="color:#999;font-size:13px;">대화록 모드가 아닙니다.</p>';
+            }
+
+            // 요약/감정 탭
+            if (currentMode === 'summary') {
+                document.getElementById('summaryBox').textContent = rawResultText;
+            } else if (currentMode === 'full') {
+                // full 모드: 구분선 이후를 요약 탭에
+                const parts = rawResultText.split('---');
+                document.getElementById('summaryBox').textContent = parts[1]?.trim() || rawResultText;
+            } else {
+                document.getElementById('summaryBox').textContent = '요약+감정 모드를 선택해 다시 분석해 주세요.';
+            }
+
+            document.getElementById('modelBadge').textContent = model;
+            document.getElementById('resultCard').style.display = 'block';
+
+            // 대화록 모드면 대화 탭 기본, 아니면 요약 탭
+            showResultTab(currentMode === 'summary' ? 'summary' : 'dialogue');
+
+            document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
             setStatus('분석이 완료되었습니다.', 'success');
 
         } catch (err) {
@@ -464,6 +768,17 @@
             analyzeBtn.classList.remove('loading');
             analyzeBtn.textContent = '분석 실행';
         }
+    }
+
+    function copyResult() {
+        if (!rawResultText) return;
+        navigator.clipboard.writeText(rawResultText).then(() => {
+            const btn = document.querySelector('.copy-btn');
+            btn.textContent = '복사 완료!';
+            setTimeout(() => btn.textContent = '결과 텍스트 복사', 1500);
+        }).catch(() => {
+            alert('복사에 실패했습니다. 텍스트를 직접 선택해 복사해 주세요.');
+        });
     }
 </script>
 </body>
