@@ -21,9 +21,12 @@
             position: sticky;
             top: 0;
             z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
         .header h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
-        .header p  { font-size: 12px; opacity: 0.85; margin-top: 2px; }
+        .header-version { font-size: 11px; opacity: 0.7; white-space: nowrap; margin-left: 12px; }
 
         .content {
             padding: 16px;
@@ -431,7 +434,7 @@
 
 <div class="header">
     <h1>녹음 비서</h1>
-    <p>음성 녹음 &rarr; 화자 분리 &amp; 대화 분석</p>
+    <span class="header-version">v1.4</span>
 </div>
 
 <div class="content">
@@ -587,10 +590,12 @@
                 document.getElementById('analyzeBtn').disabled = true;
 
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-                    ? 'audio/webm;codecs=opus'
-                    : MediaRecorder.isTypeSupported('audio/mp4')
+
+                // iOS 사파리는 mp4를 먼저 체크
+                const mimeType = MediaRecorder.isTypeSupported('audio/mp4')
                     ? 'audio/mp4'
+                    : MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+                    ? 'audio/webm;codecs=opus'
                     : 'audio/webm';
 
                 recorder = new MediaRecorder(stream, { mimeType });
@@ -842,10 +847,11 @@
 
     function saveAudio() {
         if (!currentBlob) return;
-        
-        const now  = new Date();
-        const ts   = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
-        const name = `녹음_${ts}.m4a`;
+        const now = new Date();
+        const ts  = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+        // 실제 녹음된 형식에 맞게 확장자 결정
+        const ext  = currentBlob.type.includes('mp4') ? 'm4a' : 'webm';
+        const name = `녹음_${ts}.${ext}`;
         const a    = document.createElement('a');
         a.href     = audioURL;
         a.download = name;
