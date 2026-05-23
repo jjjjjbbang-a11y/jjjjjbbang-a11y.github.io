@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 회의 분석 앱 v1.4</title>
+    <title>AI 회의 분석 앱 v1.5</title>
     <style>
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
@@ -23,7 +23,7 @@
             width: 320px; 
         }
         .version-badge {
-            background-color: #9b59b6;
+            background-color: #e67e22; /* 주황색으로 변경 */
             color: white;
             padding: 4px 8px;
             border-radius: 12px;
@@ -60,7 +60,11 @@
         #analyzeBtn { background-color: #27ae60; color: white; width: 100%; margin-top: 20px; display: none; }
         #analyzeBtn:disabled { background-color: #a9dfbf; cursor: not-allowed; }
         
-        /* 3단계 추가: 요약 버튼 및 결과창 스타일 */
+        /* 4단계 추가: 음성 톤 분석 버튼 및 박스 */
+        #emotionBtn { background-color: #d35400; color: white; width: 100%; margin-top: 15px; display: none; }
+        #emotionBtn:disabled { background-color: #edbb99; cursor: not-allowed; }
+        .emotion-box { background-color: #fdf2e9; border-color: #edbb99; }
+
         #summarizeBtn { background-color: #8e44ad; color: white; width: 100%; margin-top: 15px; display: none; }
         #summarizeBtn:disabled { background-color: #d2b4de; cursor: not-allowed; }
 
@@ -76,17 +80,17 @@
             display: none;
         }
         .transcript-box { max-height: 200px; overflow-y: auto; }
-        .summary-box { background-color: #f5eef8; border-color: #d7bde2; } /* 요약창은 보라색 톤으로 구분 */
+        .summary-box { background-color: #f5eef8; border-color: #d7bde2; } 
         
         .speaker-A { color: #2980b9; font-weight: bold; }
-        .speaker-B { color: #d35400; font-weight: bold; }
-        .keyword { font-weight: bold; color: #8e44ad; }
+        .speaker-B { color: #27ae60; font-weight: bold; } /* 개발자 색상을 초록색으로 변경 */
+        .keyword { font-weight: bold; color: #d35400; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <div class="version-badge">버전 1.4 (요약 및 감정 분석)</div>
+        <div class="version-badge">버전 1.5 (음성 톤 감정 분석)</div>
         <h2>AI 회의 비서</h2>
         
         <button id="recordBtn">🔴 녹음 시작</button>
@@ -99,7 +103,10 @@
         <button id="analyzeBtn">✨ AI 텍스트 변환 (STT)</button>
         <div id="transcriptBox" class="data-box transcript-box"></div>
 
-        <button id="summarizeBtn">📝 회의 요약 및 감정 분석</button>
+        <button id="emotionBtn">🎧 목소리 억양 및 톤 분석</button>
+        <div id="emotionBox" class="data-box emotion-box"></div>
+
+        <button id="summarizeBtn">📝 회의 요약 및 맥락 분석</button>
         <div id="summaryBox" class="data-box summary-box"></div>
     </div>
 
@@ -112,16 +119,17 @@
         const analyzeBtn = document.getElementById('analyzeBtn');
         const transcriptBox = document.getElementById('transcriptBox');
         
-        // 3단계 버튼과 박스 가져오기
+        const emotionBtn = document.getElementById('emotionBtn');
+        const emotionBox = document.getElementById('emotionBox');
+
         const summarizeBtn = document.getElementById('summarizeBtn');
         const summaryBox = document.getElementById('summaryBox');
 
         let mediaRecorder;
         let audioChunks = [];
         let currentAudioBlob = null;
-        let generatedText = ""; // LLM에게 넘겨줄 텍스트 데이터 보관용
 
-        // [1단계] 녹음 기능
+        // [1단계] 녹음
         recordBtn.addEventListener('click', async () => {
             try {
                 statusText.innerText = "마이크 권한 요청 중...";
@@ -142,8 +150,10 @@
                     analyzeBtn.style.display = "block";
                     analyzeBtn.disabled = false;
                     
-                    // 새로운 녹음 시 이전 데이터 초기화
+                    // 화면 초기화
                     transcriptBox.style.display = "none";
+                    emotionBtn.style.display = "none";
+                    emotionBox.style.display = "none";
                     summarizeBtn.style.display = "none";
                     summaryBox.style.display = "none";
                     
@@ -160,7 +170,6 @@
             } catch (error) {
                 console.error("마이크 오류:", error);
                 statusText.innerText = "마이크 권한을 허용해 주세요.";
-                statusText.style.color = "#c0392b";
             }
         });
 
@@ -173,7 +182,7 @@
             }
         });
 
-        // [2단계] STT 변환 기능
+        // [2단계] STT 변환
         analyzeBtn.addEventListener('click', () => {
             if (!currentAudioBlob) return;
 
@@ -183,51 +192,60 @@
             transcriptBox.innerHTML = "<span style='color:#7f8c8d;'>음성 인식 중... (약 2초)</span>";
 
             setTimeout(() => {
-                // 가상의 변환된 텍스트
-                generatedText = `
+                transcriptBox.innerHTML = `
                     <p><span class="speaker-A">화자 A (팀장):</span> 이번 앱 개발, 어디까지 진행됐나요?</p>
                     <p><span class="speaker-B">화자 B (개발자):</span> 방금 아이폰 사파리 오류를 잡고 2단계 테스트 중입니다.</p>
                     <p><span class="speaker-A">화자 A (팀장):</span> 고생하셨네요! 확인 끝나면 다음 단계로 바로 넘어가시죠.</p>
                 `;
-                transcriptBox.innerHTML = generatedText;
-                statusText.innerText = "✨ 변환 완료! 이제 요약해 보세요.";
+                statusText.innerText = "✨ 변환 완료! 분석을 진행해 보세요.";
                 
-                // STT가 끝나면 요약 버튼을 보여줌
+                // STT가 끝나면 음성 감정 분석, 요약 버튼 둘 다 활성화
+                emotionBtn.style.display = "block";
+                emotionBtn.disabled = false;
                 summarizeBtn.style.display = "block";
                 summarizeBtn.disabled = false;
             }, 2000);
         });
 
-        // [3단계] 대형 언어 모델(LLM) 요약 및 감정 분석 기능
-        summarizeBtn.addEventListener('click', () => {
-            statusText.innerText = "AI가 대화의 맥락과 감정을 분석 중입니다... 🧠";
-            summarizeBtn.disabled = true;
-            summaryBox.style.display = "block";
-            summaryBox.innerHTML = "<span style='color:#7f8c8d;'>LLM 서버에서 분석 중... (약 3초)</span>";
+        // [4단계] 물리적 음성 톤 및 억양 분석
+        emotionBtn.addEventListener('click', () => {
+            statusText.innerText = "음파의 높낮이와 속도를 분석 중입니다... 📊";
+            emotionBtn.disabled = true;
+            emotionBox.style.display = "block";
+            emotionBox.innerHTML = "<span style='color:#7f8c8d;'>AI 오디오 분석 모델 가동 중... (약 2초)</span>";
 
-            /* [실제 API 연동 시 참고]
-            이곳에 위에서 만든 'generatedText'를 ChatGPT API 프롬프트에 넣어서 
-            "이 대화를 요약하고 각 화자의 감정을 분석해줘" 라고 요청하는 코드가 들어갑니다.
-            */
+            /* 실제 연동 시: 오디오 파일을 Hume AI 등 감정 분석 API로 전송 */
 
             setTimeout(() => {
-                const dummySummary = `
+                emotionBox.innerHTML = `
+                    <h3 style="margin-top:0; color:#d35400;">📊 음성 파형 분석 결과</h3>
+                    <p>🔊 <span class="speaker-A">화자 A:</span> 말하는 속도가 평소보다 15% 빠르고, 문장 끝의 피치(Pitch)가 올라갑니다. <span class="keyword">[기대감 / 긍정적 흥분]</span> 상태로 분석됩니다.</p>
+                    <p>🔉 <span class="speaker-B">화자 B:</span> 일정한 데시벨(dB)과 안정적인 주파수(Hz)를 유지하고 있습니다. <span class="keyword">[차분함 / 집중]</span> 상태로 분석됩니다.</p>
+                `;
+                statusText.innerText = "🎧 음성 톤 분석 완료!";
+                emotionBtn.disabled = false;
+            }, 2500);
+        });
+
+        // [3단계] 텍스트 기반 요약 및 맥락 분석
+        summarizeBtn.addEventListener('click', () => {
+            statusText.innerText = "AI가 대화의 맥락을 요약 중입니다... 🧠";
+            summarizeBtn.disabled = true;
+            summaryBox.style.display = "block";
+            summaryBox.innerHTML = "<span style='color:#7f8c8d;'>LLM 서버에서 요약 중... (약 2초)</span>";
+
+            setTimeout(() => {
+                summaryBox.innerHTML = `
                     <h3 style="margin-top:0; color:#2c3e50;">📌 회의 요약 노트</h3>
-                    <ul style="padding-left: 20px; margin-bottom: 15px;">
+                    <ul style="padding-left: 20px; margin-bottom: 0;">
                         <li><b>주제:</b> 앱 개발 진행 상황 점검</li>
                         <li><b>현황:</b> 아이폰 브라우저 오류 해결 후 2단계 진행 중</li>
                         <li><b>다음 할 일:</b> 2단계 확인 후 3단계 신속히 착수</li>
                     </ul>
-                    
-                    <h3 style="margin-top:0; color:#2c3e50;">💡 텍스트 기반 감정/맥락 분석</h3>
-                    <p>🧑‍💼 <span class="speaker-A">화자 A (팀장):</span> 상황을 체크하고 있으며, 문제 해결 소식에 <span class="keyword">격려와 긍정적인 반응</span>을 보임. 진행 속도에 만족함.</p>
-                    <p>💻 <span class="speaker-B">화자 B (개발자):</span> 오류를 방금 해결하여 성취감이 있으며, <span class="keyword">차분하고 전문적인 태도</span>로 현재 상황을 보고함.</p>
                 `;
-                
-                summaryBox.innerHTML = dummySummary;
-                statusText.innerText = "🧠 AI 회의 분석이 모두 완료되었습니다!";
+                statusText.innerText = "🧠 AI 회의 분석 완료!";
                 summarizeBtn.disabled = false;
-            }, 3000);
+            }, 2000);
         });
     </script>
 </body>
