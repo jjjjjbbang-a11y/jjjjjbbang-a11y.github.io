@@ -150,6 +150,16 @@
         }
 
 
+        /* 자동시작 펄스 */
+        @keyframes autostart-pulse {
+            0%   { box-shadow: 0 0 0 0 rgba(26,115,232,0.7); }
+            70%  { box-shadow: 0 0 0 20px rgba(26,115,232,0); }
+            100% { box-shadow: 0 0 0 0 rgba(26,115,232,0); }
+        }
+        #recordBtn.autostart-pulse {
+            animation: autostart-pulse 1s infinite !important;
+        }
+
         /* WakeLock 상태 표시 */
         .wakelock-badge {
             display: inline-flex;
@@ -541,7 +551,7 @@
 
 <div class="header">
     <h1>녹음 비서</h1>
-    <span class="header-version">v1.5</span>
+    <span class="header-version">v1.6</span>
 </div>
 
 <div class="content">
@@ -1227,6 +1237,19 @@
             alert('복사에 실패했습니다. 텍스트를 직접 선택해 복사해 주세요.');
         });
     }
+
+    // ?autostart=1 파라미터로 접속 시 자동 녹음 유도
+    window.addEventListener('load', () => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('autostart') === '1') {
+            const btn = document.getElementById('recordBtn');
+            btn.classList.add('autostart-pulse');
+            document.getElementById('recordLabel').textContent = '탭하여 시작';
+            setStatus('단축어 실행됨 — 버튼을 한 번 탭하면 녹음 시작!', '');
+            // 버튼 탭 시 WakeLock + 녹음 자동 처리 (toggleRecord 그대로 활용)
+        }
+    });
+
 </script>
 </body>
 </html>
