@@ -150,6 +150,53 @@
         }
 
 
+        /* WakeLock 상태 표시 */
+        .wakelock-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            color: #2E7D32;
+            background: #E8F5E9;
+            border-radius: 20px;
+            padding: 3px 10px;
+            margin-top: 8px;
+        }
+        .wakelock-badge.off {
+            color: #888;
+            background: #F5F5F5;
+        }
+        .wakelock-dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: #2E7D32;
+        }
+        .wakelock-badge.off .wakelock-dot { background: #bbb; }
+
+        /* 청크 진행 표시 */
+        .chunk-info {
+            font-size: 12px;
+            color: #1A73E8;
+            background: #E8F0FE;
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin-top: 10px;
+            display: none;
+            line-height: 1.6;
+        }
+
+        /* 분할 분석 결과 누적 표시 */
+        .chunk-result-header {
+            font-size: 11px;
+            font-weight: 700;
+            color: #888;
+            background: #F5F5F5;
+            border-radius: 6px;
+            padding: 4px 10px;
+            margin: 10px 0 6px;
+            text-align: center;
+        }
+
         /* 녹음 영역 */
         .record-center {
             display: flex;
@@ -468,14 +515,33 @@
     <!-- 녹음 카드 -->
     <div class="card">
         <div class="card-title">음성 녹음</div>
+
+        <!-- 분할 간격 설정 -->
+        <div class="setting-row" style="margin-bottom:14px;">
+            <label>자동 분할 분석 간격</label>
+            <select id="chunkInterval">
+                <option value="0">분할 없음 (녹음 후 한 번에 분석)</option>
+                <option value="10" selected>10분마다 자동 분석</option>
+                <option value="20">20분마다 자동 분석</option>
+                <option value="30">30분마다 자동 분석</option>
+            </select>
+        </div>
+
         <div class="record-center">
             <button id="recordBtn" onclick="toggleRecord()">
                 <span class="mic-icon">&#127897;</span>
                 <span class="btn-label" id="recordLabel">녹음 시작</span>
             </button>
             <div id="recTimer">00:00</div>
+            <div id="wakelockBadge" class="wakelock-badge off">
+                <div class="wakelock-dot"></div>
+                <span id="wakelockText">화면 꺼짐 방지: 꺼짐</span>
+            </div>
             <div id="statusBox">버튼을 눌러 녹음을 시작하세요.</div>
         </div>
+
+        <!-- 분할 진행 안내 -->
+        <div class="chunk-info" id="chunkInfo"></div>
 
         <!-- 녹음 완료 후 재생/저장 영역 -->
         <div id="audioControlWrap" style="display:none; margin-top:16px;">
@@ -533,6 +599,13 @@
     let recSeconds = 0;
     let rawResultText = '';
     let audioURL = null;
+    let wakeLock = null;
+    let chunkTimer = null;
+    let chunkCount = 0;
+    let chunkMimeType = 'audio/mp4';
+    let allDialogue = [];
+    let allSummary = [];
+    let allEmotion = [];
 
     // 화자 색상 라벨
     const SPEAKER_COLORS = ['#1A73E8','#2E7D32','#E65100','#6A1B9A','#00695C','#C62828','#0277BD','#558B2F','#AD1457','#4527A0'];
@@ -582,131 +655,47 @@
         document.getElementById('recTimer').style.display = 'none';
     }
 
-    async function toggleRecord() {
-        if (!isRecording) {
+    // WakeLock 활성화
+    async function requestWakeLock() {
+        if ('wakeLock' in navigator) {
             try {
-                chunks = [];
-                currentBlob = null;
-                document.getElementById('analyzeBtn').disabled = true;
-
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-                // iOS 사파리는 mp4를 먼저 체크
-                const mimeType = MediaRecorder.isTypeSupported('audio/mp4')
-                    ? 'audio/mp4'
-                    : MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-                    ? 'audio/webm;codecs=opus'
-                    : 'audio/webm';
-
-                recorder = new MediaRecorder(stream, { mimeType });
-
-                recorder.ondataavailable = (e) => {
-                    if (e.data && e.data.size > 0) chunks.push(e.data);
-                };
-
-                recorder.onstop = () => {
-                    currentBlob = new Blob(chunks, { type: mimeType });
-                    stream.getTracks().forEach(t => t.stop());
-                    stopTimer();
-                    document.getElementById('analyzeBtn').disabled = false;
-                    const btn = document.getElementById('recordBtn');
-                    btn.classList.remove('recording');
-                    document.getElementById('recordLabel').textContent = '다시 녹음';
-                    isRecording = false;
-                    setStatus(`녹음 완료 (${(currentBlob.size / 1024).toFixed(1)} KB) — 분석 버튼을 누르세요.`, 'success');
-
-                    // 재생/저장 UI 활성화
-                    if (audioURL) URL.revokeObjectURL(audioURL);
-                    audioURL = URL.createObjectURL(currentBlob);
-                    const player = document.getElementById('audioPlayer');
-                    player.src = audioURL;
-                    document.getElementById('audioControlWrap').style.display = 'block';
-                };
-
-                recorder.start(100);
-                isRecording = true;
-                startTimer();
-                document.getElementById('recordBtn').classList.add('recording');
-                document.getElementById('recordLabel').textContent = '정지';
-                setStatus('녹음 중입니다...');
-
-            } catch (err) {
-                setStatus('마이크 오류: ' + err.message, 'error');
+                wakeLock = await navigator.wakeLock.request('screen');
+                updateWakeLockBadge(true);
+                wakeLock.addEventListener('release', () => updateWakeLockBadge(false));
+            } catch (e) {
+                updateWakeLockBadge(false);
             }
-        } else {
-            recorder.stop();
         }
     }
 
-    // 대화록 파싱 & 버블 렌더링
-    function renderDialogue(text) {
-        const wrap = document.getElementById('dialogueBox');
-        wrap.innerHTML = '';
-
-        // "화자1: 내용" 또는 "[화자1] 내용" 패턴 파싱
-        const lines = text.split('\n').filter(l => l.trim());
-        const speakerMap = {};
-        let spkIdx = 0;
-
-        lines.forEach(line => {
-            // 패턴: "화자N: " 또는 "[화자N] "
-            const match = line.match(/^[\[【]?(화자\s*\d+|Speaker\s*\d+|참여자\s*\d+)[\]】]?\s*[:：]\s*(.+)/i);
-            if (!match) {
-                // 화자 구분 없는 일반 줄 → 그대로 텍스트로
-                const p = document.createElement('p');
-                p.style.cssText = 'font-size:13px;color:#999;margin:4px 0;padding:0 4px;';
-                p.textContent = line;
-                wrap.appendChild(p);
-                return;
-            }
-
-            const rawName = match[1].replace(/\s/g, '');
-            const content = match[2].trim();
-
-            if (!(rawName in speakerMap)) {
-                speakerMap[rawName] = spkIdx++;
-            }
-            const idx = speakerMap[rawName] % 10;
-
-            const div = document.createElement('div');
-            div.className = `dialogue-line spk-${idx}`;
-
-            const nameEl = document.createElement('div');
-            nameEl.className = 'speaker-name';
-            nameEl.textContent = rawName;
-
-            const bubble = document.createElement('div');
-            bubble.className = 'bubble';
-            bubble.textContent = content;
-
-            div.appendChild(nameEl);
-            div.appendChild(bubble);
-            wrap.appendChild(div);
-        });
-
-        if (wrap.children.length === 0) {
-            wrap.innerHTML = '<p style="color:#999;font-size:13px;">대화 형식을 감지하지 못했습니다. 요약&감정 탭을 확인해 주세요.</p>';
-        }
+    function releaseWakeLock() {
+        if (wakeLock) { wakeLock.release(); wakeLock = null; }
+        updateWakeLockBadge(false);
     }
 
-    async function runAnalyze() {
-        const apiKey  = document.getElementById('apiKey').value.trim();
-        const model   = document.getElementById('modelSelect').value;
-        const spkCnt  = document.getElementById('speakerCount').value;
-        const analyzeBtn = document.getElementById('analyzeBtn');
+    function updateWakeLockBadge(on) {
+        const badge = document.getElementById('wakelockBadge');
+        const text  = document.getElementById('wakelockText');
+        badge.className = 'wakelock-badge' + (on ? '' : ' off');
+        text.textContent = on ? '화면 꺼짐 방지: 켜짐' : '화면 꺼짐 방지: 꺼짐';
+    }
 
-        if (!apiKey) { alert('API 키를 먼저 입력해주세요.'); return; }
-        if (!currentBlob) { alert('녹음 파일이 없습니다. 먼저 녹음해주세요.'); return; }
+    function startChunkTimer(intervalMin) {
+        if (intervalMin === 0) return;
+        const ms = intervalMin * 60 * 1000;
+        chunkTimer = setInterval(() => {
+            if (isRecording && recorder && recorder.state === 'recording') {
+                recorder.stop();
+            }
+        }, ms);
+    }
 
-        analyzeBtn.disabled = true;
-        analyzeBtn.classList.add('loading');
-        analyzeBtn.innerHTML = '<span class="spinner"></span>분석 중...';
-        document.getElementById('resultCard').style.display = 'none';
-        setStatus('AI가 분석 중입니다...');
+    function stopChunkTimer() {
+        if (chunkTimer) { clearInterval(chunkTimer); chunkTimer = null; }
+    }
 
-        // 항상 전체 분석 (대화록 + 요약 + 감정)
-        const prompt = `
-이 음성은 회의실에서 ${spkCnt}명이 나눈 대화입니다.
+    function buildPrompt(spkCnt) {
+        return `이 음성은 회의실에서 ${spkCnt}명이 나눈 대화입니다.
 아래 세 가지를 순서대로 한국어로 작성해줘.
 
 ===DIALOGUE===
@@ -737,68 +726,209 @@
 [감정 변화 흐름]
 (대화가 진행되며 분위기나 감정이 어떻게 변했는지)
 `;
+    }
 
+    async function toggleRecord() {
+        if (!isRecording) {
+            try {
+                chunks = [];
+                currentBlob = null;
+                chunkCount = 0;
+                allDialogue = [];
+                allSummary = [];
+                allEmotion = [];
+                document.getElementById('analyzeBtn').disabled = true;
+                document.getElementById('chunkInfo').style.display = 'none';
+                document.getElementById('resultCard').style.display = 'none';
+
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                chunkMimeType = MediaRecorder.isTypeSupported('audio/mp4')
+                    ? 'audio/mp4'
+                    : MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+                    ? 'audio/webm;codecs=opus'
+                    : 'audio/webm';
+
+                const intervalMin = parseInt(document.getElementById('chunkInterval').value);
+
+                function startNewRecorder() {
+                    chunks = [];
+                    recorder = new MediaRecorder(stream, { mimeType: chunkMimeType });
+
+                    recorder.ondataavailable = (e) => {
+                        if (e.data && e.data.size > 0) chunks.push(e.data);
+                    };
+
+                    recorder.onstop = async () => {
+                        const blob = new Blob(chunks, { type: chunkMimeType });
+                        chunks = [];
+                        currentBlob = blob;
+
+                        if (audioURL) URL.revokeObjectURL(audioURL);
+                        audioURL = URL.createObjectURL(blob);
+                        document.getElementById('audioPlayer').src = audioURL;
+                        document.getElementById('audioControlWrap').style.display = 'block';
+
+                        if (intervalMin > 0 && isRecording) {
+                            chunkCount++;
+                            const ci = document.getElementById('chunkInfo');
+                            ci.style.display = 'block';
+                            ci.textContent = `${chunkCount}번째 구간(${intervalMin}분) 분석 중...`;
+                            await autoAnalyzeChunk(blob, chunkCount);
+                            if (isRecording) startNewRecorder();
+                        } else if (!isRecording) {
+                            stopTimer();
+                            stopChunkTimer();
+                            releaseWakeLock();
+                            if (intervalMin > 0) {
+                                chunkCount++;
+                                const ci = document.getElementById('chunkInfo');
+                                ci.style.display = 'block';
+                                ci.textContent = `마지막 ${chunkCount}번째 구간 분석 중...`;
+                                await autoAnalyzeChunk(blob, chunkCount);
+                                const ci2 = document.getElementById('chunkInfo');
+                                ci2.textContent = `총 ${chunkCount}개 구간 분석 완료.`;
+                            } else {
+                                document.getElementById('analyzeBtn').disabled = false;
+                                setStatus(`녹음 완료 (${(blob.size / 1024).toFixed(1)} KB) — 분석 버튼을 누르세요.`, 'success');
+                            }
+                            document.getElementById('recordBtn').classList.remove('recording');
+                            document.getElementById('recordLabel').textContent = '다시 녹음';
+                        }
+                    };
+
+                    recorder.start(100);
+                }
+
+                await requestWakeLock();
+                isRecording = true;
+                startTimer();
+                startChunkTimer(intervalMin);
+                document.getElementById('recordBtn').classList.add('recording');
+                document.getElementById('recordLabel').textContent = '정지';
+                setStatus(intervalMin > 0 ? `녹음 중... (${intervalMin}분마다 자동 분할 분석)` : '녹음 중입니다...');
+                startNewRecorder();
+
+            } catch (err) {
+                setStatus('마이크 오류: ' + err.message, 'error');
+            }
+        } else {
+            isRecording = false;
+            stopChunkTimer();
+            if (recorder && recorder.state === 'recording') recorder.stop();
+        }
+    }
+
+    async function autoAnalyzeChunk(blob, chunkNum) {
+        const apiKey = document.getElementById('apiKey').value.trim();
+        const model  = document.getElementById('modelSelect').value;
+        const spkCnt = document.getElementById('speakerCount').value;
+        if (!apiKey) return;
         try {
             const base64 = await new Promise((resolve, reject) => {
                 const reader = new FileReader();
-                reader.readAsDataURL(currentBlob);
+                reader.readAsDataURL(blob);
                 reader.onloadend = () => resolve(reader.result.split(',')[1]);
                 reader.onerror = reject;
             });
-
-            const mimeType = currentBlob.type || 'audio/webm';
-
+            const mimeType = blob.type || 'audio/mp4';
             const res = await fetch(
                 `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{
-                            parts: [
-                                { text: prompt },
-                                { inlineData: { mimeType, data: base64 } }
-                            ]
-                        }]
+                        contents: [{ parts: [{ text: buildPrompt(spkCnt) }, { inlineData: { mimeType, data: base64 } }] }]
                     })
                 }
             );
-
             const data = await res.json();
-
-            if (data.error) {
-                setStatus('오류: ' + data.error.message, 'error');
-                return;
-            }
-
-            rawResultText = data.candidates?.[0]?.content?.parts?.[0]?.text || '결과를 가져올 수 없습니다.';
-
-            // 항상 3섹션 파싱
-            const dMatch = rawResultText.match(/===DIALOGUE===([\s\S]*?)(?====SUMMARY===|$)/);
-            const sMatch = rawResultText.match(/===SUMMARY===([\s\S]*?)(?====EMOTION===|$)/);
-            const eMatch = rawResultText.match(/===EMOTION===([\s\S]*?)$/);
-
-            renderDialogue(dMatch ? dMatch[1].trim() : '');
-            renderSummary(sMatch  ? sMatch[1].trim()  : '');
-            renderEmotion(eMatch  ? eMatch[1].trim()  : '');
-
-            document.getElementById('modelBadge').textContent = model;
-            document.getElementById('resultCard').style.display = 'block';
-            showResultTab('dialogue');
-
-            document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
-            setStatus('분석이 완료되었습니다.', 'success');
-
-        } catch (err) {
-            setStatus('통신 오류: ' + err.message, 'error');
-        } finally {
-            analyzeBtn.disabled = false;
-            analyzeBtn.classList.remove('loading');
-            analyzeBtn.textContent = '분석 실행';
+            if (data.error) { console.error(data.error.message); return; }
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            const dMatch = text.match(/===DIALOGUE===([\s\S]*?)(?====SUMMARY===|$)/);
+            const sMatch = text.match(/===SUMMARY===([\s\S]*?)(?====EMOTION===|$)/);
+            const eMatch = text.match(/===EMOTION===([\s\S]*?)$/);
+            if (dMatch) allDialogue.push({ num: chunkNum, text: dMatch[1].trim() });
+            if (sMatch) allSummary.push({ num: chunkNum, text: sMatch[1].trim() });
+            if (eMatch) allEmotion.push({ num: chunkNum, text: eMatch[1].trim() });
+            renderChunkedResults();
+        } catch (e) {
+            document.getElementById('chunkInfo').textContent = `${chunkNum}번째 구간 오류: ${e.message}`;
         }
     }
 
-    // 요약 렌더링
+    function renderDialogueInto(wrap, text) {
+        const lines = text.split('\n').filter(l => l.trim());
+        const speakerMap = {};
+        let spkIdx = 0;
+        lines.forEach(line => {
+            const match = line.match(/^[\[【]?(화자\s*\d+|Speaker\s*\d+|참여자\s*\d+)[\]】]?\s*[:：]\s*(.+)/i);
+            if (!match) {
+                const p = document.createElement('p');
+                p.style.cssText = 'font-size:13px;color:#999;margin:4px 0;padding:0 4px;';
+                p.textContent = line;
+                wrap.appendChild(p);
+                return;
+            }
+            const rawName = match[1].replace(/\s/g, '');
+            const content = match[2].trim();
+            if (!(rawName in speakerMap)) speakerMap[rawName] = spkIdx++;
+            const idx = speakerMap[rawName] % 10;
+            const div = document.createElement('div');
+            div.className = `dialogue-line spk-${idx}`;
+            const nameEl = document.createElement('div');
+            nameEl.className = 'speaker-name';
+            nameEl.textContent = rawName;
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.textContent = content;
+            div.appendChild(nameEl);
+            div.appendChild(bubble);
+            wrap.appendChild(div);
+        });
+    }
+
+    function renderChunkedResults() {
+        const resultCard = document.getElementById('resultCard');
+        resultCard.style.display = 'block';
+        document.getElementById('modelBadge').textContent = document.getElementById('modelSelect').value;
+        const dBox = document.getElementById('dialogueBox');
+        dBox.innerHTML = '';
+        allDialogue.forEach(c => {
+            const h = document.createElement('div');
+            h.className = 'chunk-result-header';
+            h.textContent = `${c.num}번째 구간`;
+            dBox.appendChild(h);
+            const wrap = document.createElement('div');
+            wrap.className = 'dialogue-wrap';
+            dBox.appendChild(wrap);
+            renderDialogueInto(wrap, c.text);
+        });
+        const sBox = document.getElementById('summaryBox');
+        sBox.innerHTML = allSummary.map(c =>
+            `<div style="margin-bottom:14px;"><strong style="color:#1A73E8;font-size:12px;">${c.num}번째 구간</strong><br><span style="white-space:pre-wrap;font-size:14px;color:#333;line-height:1.8;">${c.text}</span></div>`
+        ).join('<hr style="border:none;border-top:1px solid #eee;margin:10px 0;">');
+        const eBox = document.getElementById('emotionBox');
+        eBox.innerHTML = '';
+        allEmotion.forEach(c => {
+            const h = document.createElement('div');
+            h.className = 'chunk-result-header';
+            h.textContent = `${c.num}번째 구간`;
+            eBox.appendChild(h);
+            renderEmotionInto(eBox, c.text);
+        });
+        showResultTab('dialogue');
+    }
+
+    // 대화록 파싱 & 버블 렌더링
+    function renderDialogue(text) {
+        const wrap = document.getElementById('dialogueBox');
+        wrap.innerHTML = '';
+        renderDialogueInto(wrap, text);
+        if (wrap.children.length === 0) {
+            wrap.innerHTML = '<p style="color:#999;font-size:13px;">대화 형식을 감지하지 못했습니다.</p>';
+        }
+    }
     function renderSummary(text) {
         const box = document.getElementById('summaryBox');
         if (!text) {
@@ -809,42 +939,44 @@
     }
 
     // 감정 분석 렌더링
-    function renderEmotion(text) {
-        const box = document.getElementById('emotionBox');
-        if (!text) {
-            box.innerHTML = '<p style="color:#999;font-size:13px;padding:8px 0;">감정 분석 결과가 없습니다.</p>';
-            return;
-        }
-
-        // 섹션별 파싱해서 카드로 표현
-        box.innerHTML = '';
+    function renderEmotionInto(container, text) {
         const sections = [
             { key: '[전체 분위기]', label: '전체 분위기', cls: 'neutral' },
             { key: '[화자별 감정]', label: '화자별 감정', cls: 'mixed' },
             { key: '[감정 변화 흐름]', label: '감정 변화 흐름', cls: 'neutral' },
         ];
-
         let remaining = text;
+        let found = false;
         sections.forEach((sec, i) => {
             const nextKey = sections[i + 1]?.key || null;
             const start = remaining.indexOf(sec.key);
             if (start === -1) return;
+            found = true;
             const contentStart = start + sec.key.length;
             const end = nextKey ? remaining.indexOf(nextKey, contentStart) : remaining.length;
-            const content = remaining.slice(contentStart, end !== -1 ? end : undefined).trim();
-
+            const txt = remaining.slice(contentStart, end !== -1 ? end : undefined).trim();
             const card = document.createElement('div');
             card.className = `emotion-card ${sec.cls}`;
-            card.innerHTML = `<div class="emotion-label">${sec.label}</div><div class="emotion-text">${content.replace(/\n/g, '<br>')}</div>`;
-            box.appendChild(card);
+            card.innerHTML = `<div class="emotion-label">${sec.label}</div><div class="emotion-text">${txt.replace(/\n/g, '<br>')}</div>`;
+            container.appendChild(card);
         });
-
-        // 파싱 실패 시 그냥 텍스트로
-        if (box.children.length === 0) {
-            box.textContent = text;
+        if (!found) {
+            const p = document.createElement('p');
+            p.style.cssText = 'font-size:14px;color:#333;white-space:pre-wrap;line-height:1.8;';
+            p.textContent = text;
+            container.appendChild(p);
         }
     }
 
+    function renderEmotion(text) {
+        const box = document.getElementById('emotionBox');
+        box.innerHTML = '';
+        if (!text) {
+            box.innerHTML = '<p style="color:#999;font-size:13px;padding:8px 0;">감정 분석 결과가 없습니다.</p>';
+            return;
+        }
+        renderEmotionInto(box, text);
+    }
     function saveAudio() {
         if (!currentBlob) return;
         const now = new Date();
