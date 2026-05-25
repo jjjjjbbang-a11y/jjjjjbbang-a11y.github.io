@@ -541,7 +541,7 @@
 
 <div class="header">
     <h1>녹음 비서</h1>
-    <span class="header-version">v1.4</span>
+    <span class="header-version">v1.5</span>
 </div>
 
 <div class="content">
@@ -578,12 +578,12 @@
 
         <!-- 분할 간격 설정 -->
         <div class="setting-row" style="margin-bottom:14px;">
-            <label>자동 분할 분석 간격</label>
+            <label>자동 분할 저장 간격</label>
             <select id="chunkInterval">
-                <option value="0">분할 없음 (녹음 후 한 번에 분석)</option>
-                <option value="10" selected>10분마다 자동 분석</option>
-                <option value="20">20분마다 자동 분석</option>
-                <option value="30">30분마다 자동 분석</option>
+                <option value="0">분할 없음 (한 파일로 저장)</option>
+                <option value="10" selected>10분마다 자동 분할</option>
+                <option value="20">20분마다 자동 분할</option>
+                <option value="30">30분마다 자동 분할</option>
             </select>
         </div>
 
@@ -624,8 +624,10 @@
     <div class="card">
         <div class="card-title">AI 분석</div>
         <button id="analyzeBtn" onclick="runAnalyze()" disabled>분석 실행</button>
+        <button id="saveAllBtn" onclick="saveAllChunks()" style="display:none; width:100%; padding:12px; margin-top:10px; border:none; border-radius:12px; background:#34A853; color:white; font-size:15px; font-weight:600; cursor:pointer;">전체 파일 저장 (<span id="saveAllCount">0</span>개)</button>
         <div class="tip" style="margin-top:12px;">
-            녹음 완료 후 분석하면 대화록·요약·감정 분석 결과를 한 번에 확인할 수 있습니다.
+            녹음 정지 후 분석 버튼을 누르면 구간별로 순차 분석합니다.<br>
+            분할 모드에서는 전체 파일 저장으로 한 번에 다운로드할 수 있습니다.
         </div>
     </div>
 
@@ -816,6 +818,7 @@
                 document.getElementById('chunkFileList').innerHTML = '';
                 document.getElementById('chunkFileCount').textContent = '0';
                 document.getElementById('chunkAudioPlayer').style.display = 'none';
+                document.getElementById('saveAllBtn').style.display = 'none';
 
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
@@ -835,48 +838,44 @@
                         if (e.data && e.data.size > 0) chunks.push(e.data);
                     };
 
-                    recorder.onstop = async () => {
+                    recorder.onstop = () => {
                         const blob = new Blob(chunks, { type: chunkMimeType });
                         chunks = [];
                         currentBlob = blob;
 
                         if (intervalMin > 0) {
-                            // 분할 모드: 청크 파일 목록에 추가
-                            const isLast = !isRecording;
-                            const num = isRecording ? chunkCount + 1 : chunkCount + 1;
+                            // 분할 모드: 파일 목록에 추가만 (분석은 정지 후 일괄)
                             chunkCount++;
                             const chunkURL = URL.createObjectURL(blob);
                             const now = new Date();
                             const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
                             const ext = blob.type.includes('mp4') ? 'm4a' : 'webm';
                             const fname = `녹음_${ts}_${String(chunkCount).padStart(2,'0')}구간.${ext}`;
-                            chunkFiles.push({ num: chunkCount, url: chunkURL, size: blob.size, name: fname });
+                            chunkFiles.push({ num: chunkCount, url: chunkURL, size: blob.size, name: fname, blob: blob });
                             addChunkFileItem(chunkCount, chunkURL, blob.size, fname);
-
-                            // 현재 구간도 메인 플레이어에 표시
-                            currentBlob = blob;
-                            if (audioURL) URL.revokeObjectURL(audioURL);
-                            audioURL = chunkURL;
 
                             const ci = document.getElementById('chunkInfo');
                             ci.style.display = 'block';
-                            ci.textContent = `${chunkCount}번째 구간(${intervalMin}분) 분석 중...`;
-                            await autoAnalyzeChunk(blob, chunkCount);
 
                             if (isRecording) {
+                                // 아직 녹음 중 → 다음 구간 시작
+                                ci.textContent = `${chunkCount}구간 저장됨. 녹음 계속 중...`;
                                 startNewRecorder();
-                                ci.textContent = `${chunkCount}번째 구간 분석 완료. 녹음 계속 중...`;
                             } else {
+                                // 녹음 정지됨 → 마무리
                                 stopTimer();
                                 stopChunkTimer();
                                 releaseWakeLock();
-                                ci.textContent = `총 ${chunkCount}개 구간 분석 완료.`;
+                                ci.textContent = `총 ${chunkCount}개 구간 저장 완료 — 분석 버튼을 누르세요.`;
                                 document.getElementById('recordBtn').classList.remove('recording');
                                 document.getElementById('recordLabel').textContent = '다시 녹음';
+                                document.getElementById('analyzeBtn').disabled = false;
+                                // 전체저장 버튼 표시
+                                document.getElementById('saveAllBtn').style.display = 'block';
+                                document.getElementById('saveAllCount').textContent = chunkCount;
                             }
                         } else if (!isRecording) {
                             // 단일 모드
-                            currentBlob = blob;
                             if (audioURL) URL.revokeObjectURL(audioURL);
                             audioURL = URL.createObjectURL(blob);
                             document.getElementById('audioPlayer').src = audioURL;
@@ -900,7 +899,7 @@
                 startChunkTimer(intervalMin);
                 document.getElementById('recordBtn').classList.add('recording');
                 document.getElementById('recordLabel').textContent = '정지';
-                setStatus(intervalMin > 0 ? `녹음 중... (${intervalMin}분마다 자동 분할 분석)` : '녹음 중입니다...');
+                setStatus(intervalMin > 0 ? `녹음 중... (${intervalMin}분마다 자동 분할 저장)` : '녹음 중입니다...');
                 startNewRecorder();
 
             } catch (err) {
@@ -913,7 +912,86 @@
         }
     }
 
-    async function autoAnalyzeChunk(blob, chunkNum) {
+    async function runAnalyze() {
+        const apiKey     = document.getElementById('apiKey').value.trim();
+        const model      = document.getElementById('modelSelect').value;
+        const spkCnt     = document.getElementById('speakerCount').value;
+        const analyzeBtn = document.getElementById('analyzeBtn');
+
+        if (!apiKey) { alert('API 키를 먼저 입력해주세요.'); return; }
+
+        analyzeBtn.disabled = true;
+        analyzeBtn.classList.add('loading');
+
+        if (chunkFiles.length > 0) {
+            // 분할 모드: 각 구간 순차 분석
+            allDialogue = [];
+            allSummary  = [];
+            allEmotion  = [];
+            document.getElementById('resultCard').style.display = 'none';
+            for (let i = 0; i < chunkFiles.length; i++) {
+                const cf = chunkFiles[i];
+                analyzeBtn.innerHTML = '<span class="spinner"></span>' + cf.num + '/' + chunkFiles.length + '구간 분석 중...';
+                setStatus(cf.num + '번째 구간 분석 중... (' + (i+1) + '/' + chunkFiles.length + ')');
+                await autoAnalyzeChunk(cf.blob, cf.num);
+            }
+            setStatus('총 ' + chunkFiles.length + '개 구간 분석 완료.', 'success');
+            document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        } else {
+            // 단일 모드
+            if (!currentBlob) {
+                alert('녹음 파일이 없습니다. 먼저 녹음해주세요.');
+                analyzeBtn.disabled = false;
+                analyzeBtn.classList.remove('loading');
+                analyzeBtn.textContent = '분석 실행';
+                return;
+            }
+            analyzeBtn.innerHTML = '<span class="spinner"></span>분석 중...';
+            document.getElementById('resultCard').style.display = 'none';
+            setStatus('AI가 분석 중입니다...');
+            try {
+                const base64 = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(currentBlob);
+                    reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                    reader.onerror = reject;
+                });
+                const mimeType = currentBlob.type || 'audio/mp4';
+                const res = await fetch(
+                    'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: buildPrompt(spkCnt) }, { inlineData: { mimeType, data: base64 } }] }]
+                        })
+                    }
+                );
+                const data = await res.json();
+                if (data.error) { setStatus('오류: ' + data.error.message, 'error'); return; }
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                const dMatch = text.match(/===DIALOGUE===([\s\S]*?)(?====SUMMARY===|$)/);
+                const sMatch = text.match(/===SUMMARY===([\s\S]*?)(?====EMOTION===|$)/);
+                const eMatch = text.match(/===EMOTION===([\s\S]*?)$/);
+                renderDialogue(dMatch ? dMatch[1].trim() : '');
+                renderSummary(sMatch  ? sMatch[1].trim()  : '');
+                renderEmotion(eMatch  ? eMatch[1].trim()  : '');
+                document.getElementById('modelBadge').textContent = model;
+                document.getElementById('resultCard').style.display = 'block';
+                showResultTab('dialogue');
+                document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                setStatus('분석이 완료되었습니다.', 'success');
+            } catch (err) {
+                setStatus('통신 오류: ' + err.message, 'error');
+            }
+        }
+        analyzeBtn.disabled = false;
+        analyzeBtn.classList.remove('loading');
+        analyzeBtn.textContent = '분석 실행';
+    }
+
+        async function autoAnalyzeChunk(blob, chunkNum) {
         const apiKey = document.getElementById('apiKey').value.trim();
         const model  = document.getElementById('modelSelect').value;
         const spkCnt = document.getElementById('speakerCount').value;
@@ -1126,7 +1204,20 @@
         a.click();
     }
 
-    function copyResult() {
+    function saveAllChunks() {
+        if (chunkFiles.length === 0) return;
+        // 순차적으로 다운로드 (브라우저 팝업 차단 우회: 약간의 딜레이)
+        chunkFiles.forEach((cf, i) => {
+            setTimeout(() => {
+                const a = document.createElement('a');
+                a.href = cf.url;
+                a.download = cf.name;
+                a.click();
+            }, i * 500);
+        });
+    }
+
+        function copyResult() {
         if (!rawResultText) return;
         navigator.clipboard.writeText(rawResultText).then(() => {
             const btn = document.querySelector('.copy-btn');
