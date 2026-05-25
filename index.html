@@ -461,6 +461,66 @@
         }
         .save-btn:active { background: #E8F0FE; }
 
+        /* 청크 파일 목록 */
+        .chunk-files-wrap {
+            margin-top: 14px;
+            display: none;
+        }
+        .chunk-files-title {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+        .chunk-file-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid #F0F0F0;
+        }
+        .chunk-file-item:last-child { border-bottom: none; }
+        .chunk-file-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .chunk-file-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #333;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .chunk-file-size {
+            font-size: 11px;
+            color: #999;
+            margin-top: 2px;
+        }
+        .chunk-file-btn {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .chunk-play-btn, .chunk-save-btn {
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .chunk-play-btn {
+            background: #E8F0FE;
+            color: #1A73E8;
+        }
+        .chunk-save-btn {
+            background: #E8F5E9;
+            color: #2E7D32;
+        }
+        .chunk-play-btn:active { background: #C5D8F7; }
+        .chunk-save-btn:active { background: #C8E6C9; }
+
         /* 복사 버튼 */
         .copy-btn {
             margin-top: 14px;
@@ -544,10 +604,19 @@
         <div class="chunk-info" id="chunkInfo"></div>
 
         <!-- 녹음 완료 후 재생/저장 영역 -->
+        <!-- 단일 녹음 재생/저장 (분할 없음 모드) -->
         <div id="audioControlWrap" style="display:none; margin-top:16px;">
             <div class="audio-control-title">녹음된 파일</div>
             <audio id="audioPlayer" controls style="width:100%; margin:8px 0 12px; height:44px;"></audio>
             <button class="save-btn" onclick="saveAudio()">파일 저장 (.m4a)</button>
+        </div>
+
+        <!-- 분할 모드: 청크별 파일 목록 -->
+        <div class="chunk-files-wrap" id="chunkFilesWrap">
+            <div class="chunk-files-title">녹음 파일 목록 (<span id="chunkFileCount">0</span>개)</div>
+            <div id="chunkFileList"></div>
+            <!-- 인라인 플레이어 -->
+            <audio id="chunkAudioPlayer" controls style="width:100%; margin-top:10px; height:44px; display:none;"></audio>
         </div>
     </div>
 
@@ -599,6 +668,7 @@
     let recSeconds = 0;
     let rawResultText = '';
     let audioURL = null;
+    let chunkFiles = [];  // { num, url, size, name } 청크별 파일 목록
     let wakeLock = null;
     let chunkTimer = null;
     let chunkCount = 0;
@@ -737,9 +807,15 @@
                 allDialogue = [];
                 allSummary = [];
                 allEmotion = [];
+                chunkFiles = [];
                 document.getElementById('analyzeBtn').disabled = true;
                 document.getElementById('chunkInfo').style.display = 'none';
                 document.getElementById('resultCard').style.display = 'none';
+                document.getElementById('audioControlWrap').style.display = 'none';
+                document.getElementById('chunkFilesWrap').style.display = 'none';
+                document.getElementById('chunkFileList').innerHTML = '';
+                document.getElementById('chunkFileCount').textContent = '0';
+                document.getElementById('chunkAudioPlayer').style.display = 'none';
 
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
@@ -764,36 +840,54 @@
                         chunks = [];
                         currentBlob = blob;
 
-                        if (audioURL) URL.revokeObjectURL(audioURL);
-                        audioURL = URL.createObjectURL(blob);
-                        document.getElementById('audioPlayer').src = audioURL;
-                        document.getElementById('audioControlWrap').style.display = 'block';
-
-                        if (intervalMin > 0 && isRecording) {
+                        if (intervalMin > 0) {
+                            // 분할 모드: 청크 파일 목록에 추가
+                            const isLast = !isRecording;
+                            const num = isRecording ? chunkCount + 1 : chunkCount + 1;
                             chunkCount++;
+                            const chunkURL = URL.createObjectURL(blob);
+                            const now = new Date();
+                            const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+                            const ext = blob.type.includes('mp4') ? 'm4a' : 'webm';
+                            const fname = `녹음_${ts}_${String(chunkCount).padStart(2,'0')}구간.${ext}`;
+                            chunkFiles.push({ num: chunkCount, url: chunkURL, size: blob.size, name: fname });
+                            addChunkFileItem(chunkCount, chunkURL, blob.size, fname);
+
+                            // 현재 구간도 메인 플레이어에 표시
+                            currentBlob = blob;
+                            if (audioURL) URL.revokeObjectURL(audioURL);
+                            audioURL = chunkURL;
+
                             const ci = document.getElementById('chunkInfo');
                             ci.style.display = 'block';
                             ci.textContent = `${chunkCount}번째 구간(${intervalMin}분) 분석 중...`;
                             await autoAnalyzeChunk(blob, chunkCount);
-                            if (isRecording) startNewRecorder();
+
+                            if (isRecording) {
+                                startNewRecorder();
+                                ci.textContent = `${chunkCount}번째 구간 분석 완료. 녹음 계속 중...`;
+                            } else {
+                                stopTimer();
+                                stopChunkTimer();
+                                releaseWakeLock();
+                                ci.textContent = `총 ${chunkCount}개 구간 분석 완료.`;
+                                document.getElementById('recordBtn').classList.remove('recording');
+                                document.getElementById('recordLabel').textContent = '다시 녹음';
+                            }
                         } else if (!isRecording) {
+                            // 단일 모드
+                            currentBlob = blob;
+                            if (audioURL) URL.revokeObjectURL(audioURL);
+                            audioURL = URL.createObjectURL(blob);
+                            document.getElementById('audioPlayer').src = audioURL;
+                            document.getElementById('audioControlWrap').style.display = 'block';
                             stopTimer();
                             stopChunkTimer();
                             releaseWakeLock();
-                            if (intervalMin > 0) {
-                                chunkCount++;
-                                const ci = document.getElementById('chunkInfo');
-                                ci.style.display = 'block';
-                                ci.textContent = `마지막 ${chunkCount}번째 구간 분석 중...`;
-                                await autoAnalyzeChunk(blob, chunkCount);
-                                const ci2 = document.getElementById('chunkInfo');
-                                ci2.textContent = `총 ${chunkCount}개 구간 분석 완료.`;
-                            } else {
-                                document.getElementById('analyzeBtn').disabled = false;
-                                setStatus(`녹음 완료 (${(blob.size / 1024).toFixed(1)} KB) — 분석 버튼을 누르세요.`, 'success');
-                            }
+                            document.getElementById('analyzeBtn').disabled = false;
                             document.getElementById('recordBtn').classList.remove('recording');
                             document.getElementById('recordLabel').textContent = '다시 녹음';
+                            setStatus(`녹음 완료 (${(blob.size / 1024).toFixed(1)} KB) — 분석 버튼을 누르세요.`, 'success');
                         }
                     };
 
@@ -978,15 +1072,57 @@
         renderEmotionInto(box, text);
     }
     function saveAudio() {
-        if (!currentBlob) return;
+        if (!currentBlob || !audioURL) return;
         const now = new Date();
         const ts  = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
-        // 실제 녹음된 형식에 맞게 확장자 결정
         const ext  = currentBlob.type.includes('mp4') ? 'm4a' : 'webm';
         const name = `녹음_${ts}.${ext}`;
         const a    = document.createElement('a');
         a.href     = audioURL;
         a.download = name;
+        a.click();
+    }
+
+    function addChunkFileItem(num, url, size, fname) {
+        const wrap = document.getElementById('chunkFilesWrap');
+        const list = document.getElementById('chunkFileList');
+        const counter = document.getElementById('chunkFileCount');
+        wrap.style.display = 'block';
+        counter.textContent = num;
+
+        const item = document.createElement('div');
+        item.className = 'chunk-file-item';
+        item.innerHTML = `
+            <div class="chunk-file-info">
+                <div class="chunk-file-name">${num}구간 · ${fname.split('_').slice(-1)[0]}</div>
+                <div class="chunk-file-size">${(size / 1024).toFixed(1)} KB</div>
+            </div>
+            <div class="chunk-file-btn">
+                <button class="chunk-play-btn" onclick="playChunk('${url}', this)">재생</button>
+                <button class="chunk-save-btn" onclick="downloadChunk('${url}', '${fname}')">저장</button>
+            </div>`;
+        list.appendChild(item);
+    }
+
+    function playChunk(url, btn) {
+        const player = document.getElementById('chunkAudioPlayer');
+        // 같은 파일 재생 중이면 정지
+        if (player.src === url && !player.paused) {
+            player.pause();
+            btn.textContent = '재생';
+            return;
+        }
+        player.src = url;
+        player.style.display = 'block';
+        player.play();
+        btn.textContent = '정지';
+        player.onended = () => { btn.textContent = '재생'; };
+    }
+
+    function downloadChunk(url, fname) {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fname;
         a.click();
     }
 
