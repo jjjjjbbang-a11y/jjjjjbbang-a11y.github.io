@@ -582,7 +582,7 @@
 
 <div class="header">
     <h1>녹음 비서</h1>
-    <span class="header-version">v1.8</span>
+    <span class="header-version">v1.9</span>
 </div>
 
 <div class="content">
@@ -1362,10 +1362,8 @@
     }
 
     async function uploadFileToDrive(blob, filename) {
-        const metadata = {
-            name: filename,
-            mimeType: blob.type || 'audio/mp4'
-        };
+        const mimeType = blob.type || 'audio/mp4';
+        const metadata = { name: filename, mimeType: mimeType };
         const form = new FormData();
         form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
         form.append('file', blob, filename);
@@ -1375,11 +1373,11 @@
             headers: { Authorization: 'Bearer ' + driveAccessToken },
             body: form
         });
+        const json = await res.json();
         if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.error?.message || '업로드 실패');
+            throw new Error((json.error?.message || JSON.stringify(json)));
         }
-        return await res.json();
+        return json;
     }
 
     async function driveUploadAll() {
@@ -1387,9 +1385,6 @@
             setDriveStatus('먼저 로그인 해주세요.', 'error');
             return;
         }
-
-        const uploadBtn = document.getElementById('driveUploadBtn');
-        uploadBtn.disabled = true;
 
         // 분할 모드: chunkFiles 전체 업로드
         if (chunkFiles.length > 0) {
@@ -1402,7 +1397,8 @@
                     await uploadFileToDrive(cf.blob, cf.name);
                     success++;
                 } catch(e) {
-                    setDriveStatus(cf.name + ' 업로드 실패: ' + e.message, 'error');
+                    setDriveStatus('업로드 실패: ' + e.message, 'error');
+                    return;
                 }
             }
             setDriveStatus('완료! ' + success + '개 파일이 드라이브에 저장됐습니다.', 'ok');
@@ -1415,15 +1411,13 @@
             setDriveStatus('업로드 중...');
             try {
                 await uploadFileToDrive(currentBlob, fname);
-                setDriveStatus('완료! ' + fname + ' 이 드라이브에 저장됐습니다.', 'ok');
+                setDriveStatus('완료! ' + fname + ' 드라이브에 저장됐습니다.', 'ok');
             } catch(e) {
                 setDriveStatus('업로드 실패: ' + e.message, 'error');
             }
         } else {
             setDriveStatus('업로드할 파일이 없습니다.', 'error');
         }
-
-        uploadBtn.disabled = false;
     }
 
     // ?autostart=1 파라미터로 접속 시 자동 녹음 유도
