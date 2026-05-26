@@ -531,6 +531,36 @@
         .chunk-play-btn:active { background: #C5D8F7; }
         .chunk-save-btn:active { background: #C8E6C9; }
 
+        /* 구글 드라이브 업로드 */
+        .drive-section {
+            margin-top: 14px;
+            border-top: 1px solid #F0F0F0;
+            padding-top: 14px;
+        }
+        .drive-section-title { font-size: 12px; color: #888; margin-bottom: 8px; }
+        .drive-btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            background: #4285F4;
+            color: white;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 8px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .drive-btn:active { background: #2b6fd4; }
+        .drive-btn:disabled { background: #BDBDBD; cursor: not-allowed; }
+        .drive-status { font-size: 12px; color: #666; margin-top: 8px; text-align: center; min-height: 16px; }
+        .drive-status.error   { color: #E53935; }
+        .drive-status.ok      { color: #2E7D32; }
+
         /* 복사 버튼 */
         .copy-btn {
             margin-top: 14px;
@@ -546,12 +576,13 @@
         }
         .copy-btn:active { background: #E8F0FE; }
     </style>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
 <div class="header">
     <h1>녹음 비서</h1>
-    <span class="header-version">v1.6</span>
+    <span class="header-version">v1.7</span>
 </div>
 
 <div class="content">
@@ -667,6 +698,16 @@
         </div>
 
         <button class="copy-btn" onclick="copyResult()">결과 텍스트 복사</button>
+
+        <!-- 구글 드라이브 업로드 -->
+        <div class="drive-section" id="driveSection">
+            <div class="drive-section-title">구글 드라이브에 저장</div>
+            <button class="drive-btn" id="driveLoginBtn" onclick="driveLogin()">구글 드라이브 로그인</button>
+            <div id="driveUploadWrap" style="display:none;">
+                <button class="drive-btn" id="driveUploadBtn" onclick="driveUploadAll()" style="background:#34A853;">녹음 파일 드라이브 업로드</button>
+            </div>
+            <div class="drive-status" id="driveStatus"></div>
+        </div>
     </div>
 
 </div>
@@ -1236,6 +1277,109 @@
         }).catch(() => {
             alert('복사에 실패했습니다. 텍스트를 직접 선택해 복사해 주세요.');
         });
+    }
+
+
+    // ===== 구글 드라이브 연동 =====
+    const DRIVE_CLIENT_ID = '5450854236-6vopo70lsnjua4c5orfav0nmbbt351ed.apps.googleusercontent.com';
+    const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+    let driveAccessToken = null;
+
+    function driveLogin() {
+        const btn = document.getElementById('driveLoginBtn');
+        btn.disabled = true;
+        btn.textContent = '로그인 중...';
+        setDriveStatus('');
+
+        const client = google.accounts.oauth2.initTokenClient({
+            client_id: DRIVE_CLIENT_ID,
+            scope: DRIVE_SCOPE,
+            callback: (resp) => {
+                if (resp.error) {
+                    setDriveStatus('로그인 실패: ' + resp.error, 'error');
+                    btn.disabled = false;
+                    btn.textContent = '구글 드라이브 로그인';
+                    return;
+                }
+                driveAccessToken = resp.access_token;
+                btn.textContent = '로그인 완료';
+                btn.style.background = '#34A853';
+                document.getElementById('driveUploadWrap').style.display = 'block';
+                setDriveStatus('로그인 성공! 업로드 버튼을 누르세요.', 'ok');
+            }
+        });
+        client.requestAccessToken();
+    }
+
+    function setDriveStatus(msg, type) {
+        const el = document.getElementById('driveStatus');
+        el.textContent = msg;
+        el.className = 'drive-status' + (type ? ' ' + type : '');
+    }
+
+    async function uploadFileToDrive(blob, filename) {
+        const metadata = {
+            name: filename,
+            mimeType: blob.type || 'audio/mp4'
+        };
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        form.append('file', blob, filename);
+
+        const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer ' + driveAccessToken },
+            body: form
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error?.message || '업로드 실패');
+        }
+        return await res.json();
+    }
+
+    async function driveUploadAll() {
+        if (!driveAccessToken) {
+            setDriveStatus('먼저 로그인 해주세요.', 'error');
+            return;
+        }
+
+        const uploadBtn = document.getElementById('driveUploadBtn');
+        uploadBtn.disabled = true;
+
+        // 분할 모드: chunkFiles 전체 업로드
+        if (chunkFiles.length > 0) {
+            setDriveStatus('0 / ' + chunkFiles.length + ' 업로드 중...');
+            let success = 0;
+            for (let i = 0; i < chunkFiles.length; i++) {
+                const cf = chunkFiles[i];
+                setDriveStatus((i+1) + ' / ' + chunkFiles.length + ' 업로드 중... (' + cf.name + ')');
+                try {
+                    await uploadFileToDrive(cf.blob, cf.name);
+                    success++;
+                } catch(e) {
+                    setDriveStatus(cf.name + ' 업로드 실패: ' + e.message, 'error');
+                }
+            }
+            setDriveStatus('완료! ' + success + '개 파일이 드라이브에 저장됐습니다.', 'ok');
+        } else if (currentBlob) {
+            // 단일 모드
+            const now = new Date();
+            const ts = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '_' + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
+            const ext = currentBlob.type.includes('mp4') ? 'm4a' : 'webm';
+            const fname = '녹음_' + ts + '.' + ext;
+            setDriveStatus('업로드 중...');
+            try {
+                await uploadFileToDrive(currentBlob, fname);
+                setDriveStatus('완료! ' + fname + ' 이 드라이브에 저장됐습니다.', 'ok');
+            } catch(e) {
+                setDriveStatus('업로드 실패: ' + e.message, 'error');
+            }
+        } else {
+            setDriveStatus('업로드할 파일이 없습니다.', 'error');
+        }
+
+        uploadBtn.disabled = false;
     }
 
     // ?autostart=1 파라미터로 접속 시 자동 녹음 유도
