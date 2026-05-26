@@ -1322,9 +1322,37 @@
                 const ls = document.getElementById('driveLoginStatus');
                 if (ls) { ls.textContent = '로그인 완료! 녹음 정지 시 자동으로 드라이브에 저장됩니다.'; ls.className = 'drive-status ok'; }
                 setDriveStatus('드라이브 연동 완료.');
+                // 55분마다 토큰 자동 갱신 시작
+                startTokenRefresh();
             }
         });
         client.requestAccessToken();
+    }
+
+    let tokenRefreshTimer = null;
+
+    function startTokenRefresh() {
+        // 기존 타이머 있으면 제거
+        if (tokenRefreshTimer) clearInterval(tokenRefreshTimer);
+        // 55분마다 토큰 조용히 갱신
+        tokenRefreshTimer = setInterval(() => {
+            try {
+                const client = google.accounts.oauth2.initTokenClient({
+                    client_id: DRIVE_CLIENT_ID,
+                    scope: DRIVE_SCOPE,
+                    prompt: '',  // 팝업 없이 백그라운드 갱신
+                    callback: (resp) => {
+                        if (!resp.error) {
+                            driveAccessToken = resp.access_token;
+                            console.log('드라이브 토큰 갱신 완료');
+                        }
+                    }
+                });
+                client.requestAccessToken();
+            } catch(e) {
+                console.log('토큰 갱신 실패:', e.message);
+            }
+        }, 55 * 60 * 1000);
     }
 
     function setDriveStatus(msg, type) {
